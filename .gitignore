@@ -1,0 +1,38 @@
+# Sistema operacional / editores
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Python / Django
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+db.sqlite3
+*.log
+.env
+.env.*
+media/
+staticfiles/
+
+# Frontend (Node/Vite/Vue)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.eslintcache
+frontend/.cache/
+
+# Bundles copiados para o Django (gerados no build)
+server/static/frontend/
+server/templates/index.html
+
+# Outros
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+

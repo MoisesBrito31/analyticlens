@@ -1,0 +1,10 @@
+Stack mínimo (frontend)
+Vue 3 + Vite (+ plugin oficial já vem no scaffold)
+Vue Router (rotas públicas/privadas)
+Pinia (estado global simples)
+BootstrapVue 3 (UI padronizada)
+Vue Flow (canvas do builder)
+FormKit (forms e config no-code)
+Zod (validação de runtime)
+ESLint (lint básico)
+fetch wrapper centralizado

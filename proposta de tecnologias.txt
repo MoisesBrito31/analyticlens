@@ -1,0 +1,49 @@
+### Ideia geral
+Você quer que o usuário configure inspeções visuais via low-code/no-code. Recomendo montar a solução com um “builder” de fluxos e regras no front, um serviço de visão computacional no back (com modelos prontos e detecção de anomalias), e streaming de vídeo/frames anotados em tempo real.
+
+### Stack recomendada (MVP enxuto)
+- Frontend (no-code/low-code)
+  - **Vue 3 + Vite** e **BootstrapVue 3** para UI consistente.
+  - **Vue Flow** para o canvas de fluxos (arrastar nós: câmera → pré-processo → modelo → regra → saída).
+  - **FormKit** para formulários de configuração.
+  - **Pinia** para estado e **Zod** para validar esquemas de pipelines.
+  - Chamadas HTTP com **fetch** e UI com **BootstrapVue** conforme sua preferência [[memory:5093558]].
+- Backend (inspeção + APIs)
+  - **FastAPI (Python)** para APIs e orquestração leve.
+  - **OpenCV** para pré-processamento; **Ultralytics YOLOv8/YOLOv10** para detecção; **Anomalib (PaDiM/DRAEM/PatchCore)** para anomalia.
+  - **ONNX Runtime** (CPU) e opção de **TensorRT** (GPU) ou **OpenVINO** (Intel) para inferência otimizada.
+  - Streaming: **WebSocket** para eventos/overlays e **RTSP/FFmpeg** para vídeo; em MVP, envie frames JPEG + metadados por WebSocket.
+- Mensageria e jobs
+  - **Redis** para fila/cache; jobs com **RQ** ou **Celery**.
+  - **MQTT** para integrar borda/dispositivos (opcional).
+- Armazenamento
+  - **PostgreSQL** para metadados e configurações de pipelines.
+  - **MinIO/S3** para imagens e amostras rotuladas.
+  - Logs/métricas com **Prometheus + Grafana**; erros com **Sentry**.
+- Borda (edge)
+  - Serviço Python (FastAPI + OpenCV) que lê **RTSP/USB/GigE**, roda inferência local, publica eventos.
+  - Aceleração: **CUDA/TensorRT** (NVIDIA) ou **OpenVINO** (Intel CPU/iGPU).
+- DevOps
+  - **Docker + docker-compose** (MVP) e **GitHub Actions**.
+  - Escala futura: **Kubernetes**.
+
+### Componentes low-code/no-code que aceleram
+- **Canvas de fluxos**: Vue Flow (nós customizados com propriedades).
+- **Regra no-code**: **JSONLogic** + UI de regras (builder visual).
+- **Formulários**: FormKit + schemas (Zod).
+- **Templates**: presets prontos (ex.: “detectar riscos”, “contagem de peças”, “anomalia superfície”).
+
+### Alternativas gerenciadas (se quiser ir mais rápido)
+- **AWS Lookout for Vision**, **Azure Custom Vision** ou **Google Vertex** para treinar/servir modelos sem manter infraestrutura (trade-off: custo/lock-in/latência).
+
+### Roadmap de 3 fases
+1) MVP
+- Fluxo simples no Vue Flow; salvar pipeline em JSON.
+- Backend FastAPI lendo câmera RTSP, rodando YOLOv8, regras JSONLogic, eventos via WebSocket.
+- Postgres + MinIO, Docker Compose.
+2) Pro
+- Anomalib, multi-câmera, controle de versões de modelos (**MLflow**), RBAC, monitoramento.
+3) Escala
+- GPU/TensorRT, WebRTC para streaming de baixa latência, multi-site com MQTT e K8s.
+
+Se quiser, já estruturo um esqueleto de projeto com Docker Compose, FastAPI, Vue 3 + BootstrapVue 3, Vue Flow e um pipeline JSON funcional.

@@ -1,0 +1,22 @@
+- **NumPy**: base numérica. Arrays N-dimensionais, operações vetorizadas, estatística e álgebra linear.
+ Representaremos imagens como `ndarray` para processar rápido.
+
+- **opencv-python-headless**: visão computacional sem dependências de GUI (ideal para servidor). 
+Conversões de cor, filtros, morfologia, segmentação, detecção de contornos/“blobs”, codificação/decodificação 
+de imagens em memória.
+
+- **Pillow (PIL)**: I/O e manipulação simples de imagens. Abrir/salvar vários formatos, redimensionar, 
+recortar, converter modos (RGB/PNG/JPEG), anotar (draw). Útil para interagir com arquivos e `ImageField` do Django.
+
+- **Django**: framework web completo. ORM, migrations, admin, autenticação, middlewares e configuração. 
+Base do backend e integração com banco/segurança.
+
+- **Django REST Framework (DRF)**: construção de APIs REST. Serializers, ViewSets, Routers, permissões, 
+autenticação, paginação, throttling e Browsable API para teste.
+
+- **django-cors-headers**: configura CORS. Define origens permitidas, cabeçalhos e métodos, lida com preflight; 
+necessário quando o front (Vite) acessa a API em outro host/porta.
+
+- - -
+- Resumo: NumPy/OpenCV tratam o processamento numérico e de imagem; Pillow cuida de I/O/manipulação simples; 
+Django/DRF expõem as APIs e persistência; cors-headers habilita o acesso do front à API.
