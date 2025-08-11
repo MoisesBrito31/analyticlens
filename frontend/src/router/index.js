@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
+import LiveView from '../views/LiveView.vue'
+import InspectionsView from '../views/InspectionsView.vue'
+import ImageLogView from '../views/ImageLogView.vue'
+import ConfigurationsView from '../views/ConfigurationsView.vue'
+import InspectionEditView from '../views/InspectionEditView.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -9,19 +13,56 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView,
+      component: LiveView, // Redireciona para ao vivo por padrão
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/live',
+      name: 'live',
+      component: LiveView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/inspections',
+      name: 'inspections',
+      component: InspectionsView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/image-log',
+      name: 'image-log',
+      component: ImageLogView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/configurations',
+      name: 'configurations',
+      component: ConfigurationsView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/inspection/edit',
+      name: 'inspection-create',
+      component: InspectionEditView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/inspection/edit/:id',
+      name: 'inspection-edit',
+      component: InspectionEditView,
       meta: { requiresAuth: true },
     },
     {
       path: '/about',
       name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
       meta: { requiresAuth: true },
     },
-    { path: '/login', name: 'login', component: LoginView },
+    { 
+      path: '/login', 
+      name: 'login', 
+      component: LoginView 
+    },
   ],
 })
 

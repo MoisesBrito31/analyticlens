@@ -1,85 +1,125 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+// O header agora é gerenciado por cada view individual
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
+  <div id="app">
+    <router-view />
+  </div>
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+<style>
+#app {
+  min-height: 100vh;
+  background-color: #f8f9fa;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+/* Layout responsivo para as regiões */
+.app-container {
+  min-height: 100vh;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
+.main-content {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1rem;
+  align-items: start;
+  justify-content: center;
 }
 
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+/* Para telas menores, empilhar verticalmente */
+@media (max-width: 768px) {
+  .main-content {
+    grid-template-columns: 1fr;
   }
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
+/* Para telas muito grandes, limitar largura máxima */
+@media (min-width: 1400px) {
+  .main-content {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    max-width: 1400px;
+    margin: 0 auto;
   }
+}
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
+/* Cards responsivos */
+.card {
+  height: fit-content;
+  min-height: 200px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: none;
+  border-radius: 8px;
+}
+
+.card-header {
+  background-color: #fff;
+  border-bottom: 1px solid #e9ecef;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+/* Ajustes para componentes específicos */
+.inspection-info {
+  grid-column: span 1;
+}
+
+.inspection-actions {
+  grid-column: span 1;
+}
+
+.last-image {
+  grid-column: span 1;
+}
+
+.live-stream {
+  grid-column: span 2;
+}
+
+.tools-canvas {
+  grid-column: span 2;
+}
+
+.tool-properties {
+  grid-column: span 1;
+}
+
+/* Para telas menores, alguns componentes ocupam toda a largura */
+@media (max-width: 768px) {
+  .live-stream,
+  .tools-canvas {
+    grid-column: span 1;
   }
+}
 
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
+/* Estilos para o navbar */
+.navbar-brand {
+  font-weight: 600;
+}
 
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
+.nav-link {
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0.375rem;
+}
+
+/* Estilos para botões de ação */
+.btn-group .btn {
+  border-radius: 0.375rem;
+}
+
+.btn-group .btn:not(:last-child) {
+  margin-right: 0.25rem;
 }
 </style>

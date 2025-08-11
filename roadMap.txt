@@ -1,0 +1,148 @@
+## **�� Roadmap - Próximos Passos para AnalyticLens**
+
+### **📋 Fase 1: Estrutura Base e Autenticação (✅ CONCLUÍDA)**
+- ✅ Stack tecnológica definida (Vue 3 + Django)
+- ✅ Estrutura de arquivos organizada
+- ✅ Sistema de autenticação implementado
+- ✅ Navegação e rotas configuradas
+- ✅ Layout responsivo implementado
+- ✅ Componentes reutilizáveis criados
+
+---
+
+### **�� Fase 2: Backend de Visão Computacional (PRÓXIMA PRIORIDADE)**
+
+#### **2.1 Módulo de Tools Base**
+- [ ] Criar arquitetura modular para tools de visão
+- [ ] Implementar interface base `ToolBase` com contrato padrão
+- [ ] Criar sistema de registro de tools
+- [ ] Implementar tool "Blob Detection" como exemplo
+
+#### **2.2 Endpoints da API**
+- [ ] `GET /api/tools` - Listar tools disponíveis
+- [ ] `POST /api/tools/blob/run` - Executar tool blob
+- [ ] `GET /api/tools/blob/params` - Parâmetros da tool
+- [ ] `POST /api/inspections/` - CRUD de inspeções
+- [ ] `GET /api/inspections/{id}/results` - Resultados das inspeções
+
+#### **2.3 Estrutura de Dados**
+- [ ] Modelo `Inspection` para configurações
+- [ ] Modelo `InspectionResult` para resultados
+- [ ] Modelo `ToolExecution` para logs de execução
+- [ ] Serializers DRF para todas as entidades
+
+---
+
+### **�� Fase 3: Frontend - Canvas de Tools**
+
+#### **3.1 Integração Vue Flow**
+- [ ] Instalar e configurar `@vue-flow/core`
+- [ ] Criar nós customizados para cada tipo de tool
+- [ ] Implementar drag & drop de tools no canvas
+- [ ] Sistema de conexões entre tools (edges)
+
+#### **3.2 Formulários de Configuração**
+- [ ] Integrar FormKit para configurações
+- [ ] Formulários dinâmicos baseados no tipo de tool
+- [ ] Validação com Zod
+- [ ] Preview em tempo real dos parâmetros
+
+#### **3.3 Interface de Edição**
+- [ ] Toolbar com tools disponíveis
+- [ ] Painel de propriedades da tool selecionada
+- [ ] Sistema de undo/redo
+- [ ] Preview da pipeline de inspeção
+
+---
+
+### **�� Fase 4: Execução e Monitoramento**
+
+#### **4.1 Sistema de Execução**
+- [ ] Execução de inspeções em tempo real
+- [ ] Fila de processamento de imagens
+- [ ] Sistema de notificações (WebSocket)
+- [ ] Logs de execução detalhados
+
+#### **4.2 Dashboard de Monitoramento**
+- [ ] Métricas em tempo real (FPS, precisão, latência)
+- [ ] Gráficos de performance
+- [ ] Alertas e notificações
+- [ ] Histórico de execuções
+
+#### **4.3 Gestão de Imagens**
+- [ ] Upload de imagens para teste
+- [ ] Galeria de imagens processadas
+- [ ] Comparação antes/depois
+- [ ] Exportação de resultados
+
+---
+
+### **🔐 Fase 5: Funcionalidades Avançadas**
+
+#### **5.1 Sistema de Usuários**
+- [ ] Roles e permissões (Admin, Operador, Visualizador)
+- [ ] Auditoria de ações
+- [ ] Configurações por usuário
+
+#### **5.2 Configurações Globais**
+- [ ] Configurações de câmeras (IP, RTSP, resolução)
+- [ ] Parâmetros de rede e segurança
+- [ ] Backup e retenção de dados
+- [ ] Configurações de notificações
+
+#### **5.3 Integrações**
+- [ ] Webhooks para sistemas externos
+- [ ] API REST para integração com MES/ERP
+- [ ] Exportação de dados (CSV, Excel, JSON)
+- [ ] Backup automático para cloud
+
+---
+
+### **🚀 Fase 6: Otimizações e Deploy**
+
+#### **6.1 Performance**
+- [ ] Cache de resultados de tools
+- [ ] Otimização de queries de banco
+- [ ] Compressão de imagens
+- [ ] Load balancing para múltiplas instâncias
+
+#### **6.2 Deploy e Infraestrutura**
+- [ ] Dockerização da aplicação
+- [ ] CI/CD pipeline
+- [ ] Monitoramento de infraestrutura
+- [ ] Backup e disaster recovery
+
+#### **6.3 Testes e Qualidade**
+- [ ] Testes unitários (Jest + PyTest)
+- [ ] Testes de integração
+- [ ] Testes E2E (Cypress/Playwright)
+- [ ] Code coverage e análise estática
+
+---
+
+### **🎯 Prioridades Imediatas (Próximas 2-3 Semanas)**
+
+1. **Implementar tool "Blob Detection" no backend**
+2. **Criar endpoints `/api/tools` e `/api/tools/blob/run`**
+3. **Integrar Vue Flow no canvas de edição**
+4. **Implementar formulários com FormKit**
+5. **Sistema básico de execução de inspeções**
+
+---
+
+### **💡 Tecnologias a Adicionar**
+
+- **Backend**: `celery` (filas), `redis` (cache), `websockets`
+- **Frontend**: `@vue-flow/core`, `@formkit/vue`, `chart.js`
+- **DevOps**: `docker`, `docker-compose`, `nginx`
+- **Testes**: `pytest`, `jest`, `cypress`
+
+---
+
+### **📈 Métricas de Sucesso**
+
+- **Funcional**: Pipeline visual funcionando
+- **Performance**: < 100ms para execução de tools simples
+- **Usabilidade**: < 5 cliques para criar inspeção básica
+- **Estabilidade**: 99.9% uptime em produção
+

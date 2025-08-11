@@ -36,7 +36,7 @@ async function onSubmit() {
     await auth.login({ username: username.value, password: password.value })
     const redirect = route.query.redirect || '/'
     router.replace(redirect)
-  } catch (e) {
+  } catch {
     error.value = 'Usuário ou senha inválidos'
   }
 }

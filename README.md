@@ -48,57 +48,31 @@ Plataforma low-code/no-code para configurar inspeções visuais. O usuário mont
 
 ### Backend (Django + DRF)
 
+Já está configurado no projeto.
+
 ```bash
 python -m venv .venv
-. .venv/Scripts/activate  # Windows PowerShell: . .venv/Scripts/Activate.ps1
+. .venv/Scripts/activate  # Windows PowerShell
 pip install --upgrade pip
 pip install django djangorestframework django-cors-headers numpy opencv-python-headless pillow
-
-# Se ainda não houver projeto
-django-admin startproject server
-cd server
-python manage.py startapp api
+python manage.py migrate
+python manage.py createsuperuser  # crie um usuário admin
+python manage.py runserver
 ```
 
-Habilite apps e middlewares em `server/settings.py`:
+Pontos importantes já aplicados no código:
 
-```python
-INSTALLED_APPS = [
-    # ...
-    'rest_framework',
-    'corsheaders',
-    'api',
-]
+- `INSTALLED_APPS`: `rest_framework`, `corsheaders`, `api`, `user`
+- `MIDDLEWARE`: `corsheaders.middleware.CorsMiddleware`
+- CORS/CSRF dev: `http://localhost:5173`
+- `AUTH_USER_MODEL = 'user.User'` (modelo customizado)
+- `TEMPLATES.DIRS = server/templates` e `STATICFILES_DIRS = server/static`
 
-MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    # ... demais middlewares do Django ...
-]
+Rotas principais do backend:
 
-# Dev: permitir Vite
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-]
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-]
-```
-
-URLs com API prefixada e fallback do SPA (quando for servir o build pelo Django):
-
-```python
-# server/urls.py
-from django.contrib import admin
-from django.urls import path, include, re_path
-from django.views.generic import TemplateView
-
-urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/', include('api.urls')),
-    # Fallback SPA (em produção, quando o build estiver integrado ao Django)
-    re_path(r'^(?!api/|admin/|static/|media/).*$', TemplateView.as_view(template_name='index.html')),
-]
-```
+- `/api/` → DRF apps
+- `/api/auth/csrf` | `/api/auth/login` | `/api/auth/logout` | `/api/auth/me` (sessão)
+- Fallback SPA: qualquer rota não‑API cai em `templates/index.html`
 
 Endpoints iniciais (sugestão):
 
@@ -108,96 +82,74 @@ Endpoints iniciais (sugestão):
 
 ### Frontend (Vue 3 + Vite)
 
-```bash
-# Cria projeto com Router, Pinia e ESLint (JavaScript para manter simples)
-npm create vue@latest frontend
-# selecione: JavaScript, Router=Yes, Pinia=Yes, ESLint=Yes
+Já está configurado no diretório `frontend/`.
 
+```bash
 cd frontend
 npm i
-npm i bootstrap bootstrap-vue-3
-npm i @vue-flow/core @vue-flow/controls @vue-flow/minimap @vue-flow/background
-npm i @formkit/vue @formkit/themes
-npm i zod
+npm run dev
 ```
 
-`vite.config.ts` com proxy para a API (dev):
+Configurações relevantes já no código:
 
-```ts
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+- `vite.config.js`: proxy `/api -> http://localhost:8000` e build com `manifest`
+- `src/main.js`: registra BootstrapVue 3 e FormKit (com temas)
+- `src/utils/http.js`: wrapper `fetch` que inclui `credentials: 'include'` e injeta `X-CSRFToken` automaticamente em requisições não‑GET
+- Autenticação no front:
+  - Store `src/stores/auth.js` com `login`, `logout`, `loadMe`
+  - `src/views/LoginView.vue`
+  - Guard no `vue-router` exigindo login (`meta.requiresAuth`)
 
-export default defineConfig({
-  plugins: [vue()],
-  server: { proxy: { '/api': 'http://localhost:8000' } },
-})
-```
-
-Importe estilos e registre plugins no `main` do front:
-
-```ts
-// src/main.ts
-import { createApp } from 'vue'
-import App from './App.vue'
-import router from './router'
-import { createPinia } from 'pinia'
-
-import 'bootstrap/dist/css/bootstrap.css'
-import 'bootstrap-vue-3/dist/bootstrap-vue-3.css'
-import BootstrapVue3 from 'bootstrap-vue-3'
-
-import { plugin as FormKit, defaultConfig } from '@formkit/vue'
-import '@formkit/themes/genesis'
-
-createApp(App)
-  .use(router)
-  .use(createPinia())
-  .use(BootstrapVue3)
-  .use(FormKit, defaultConfig)
-  .mount('#app')
-```
-
-Wrapper simples para HTTP com fetch:
-
-```ts
-// src/utils/http.ts
-export async function apiFetch(input: RequestInfo, init: RequestInit = {}) {
-  const headers = new Headers(init.headers)
-  if (init.method && init.method !== 'GET' && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json')
-  }
-  const res = await fetch(input, { credentials: 'include', ...init, headers })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res
-}
-```
-
-## Estrutura sugerida
+## Estrutura atual do repositório
 
 ```text
 analyticLens/
-├─ backend/ (opcional, se preferir separar)
-│
-├─ server/               # Django project
-│  ├─ api/               # app DRF (endpoints)
-│  └─ ...
-│
+├─ .venv/                # ambiente virtual Python
+├─ .git/                 # repositório Git
+├─ api/                  # app DRF (endpoints básicos, ex.: /api/ping)
 ├─ frontend/             # Vue 3 + Vite (SPA)
 │  ├─ src/
+│  │  ├─ assets/         # CSS, imagens
+│  │  ├─ components/     # componentes Vue
 │  │  ├─ router/         # vue-router
-│  │  ├─ stores/         # pinia
-│  │  ├─ utils/http.ts   # fetch wrapper
-│  │  └─ features/flow/  # Vue Flow + FormKit (builder)
-│  └─ ...
-└─ README.md
+│  │  ├─ stores/         # pinia (auth, counter)
+│  │  ├─ utils/          # http.js (wrapper fetch)
+│  │  └─ views/          # páginas (Home, About, Login)
+│  ├─ scripts/           # copy-dist-to-django.mjs
+│  ├─ dist/              # build do Vite (gerado)
+│  ├─ node_modules/      # dependências Node
+│  ├─ package.json       # dependências e scripts
+│  └─ vite.config.js     # configuração Vite + proxy
+├─ server/               # Django project
+│  ├─ templates/         # index.html do SPA (reescrito no build)
+│  ├─ static/frontend/   # bundles do Vite copiados no build
+│  ├─ settings.py        # configuração Django
+│  └─ urls.py            # roteamento principal
+├─ user/                 # app de autenticação (User custom + endpoints /api/auth/*)
+├─ manage.py             # Django CLI
+├─ db.sqlite3            # banco SQLite (gerado)
+├─ .gitignore            # arquivos ignorados pelo Git
+├─ .gitattributes        # configurações Git
+└─ README.md             # este arquivo
 ```
+
+**Nota**: Os apps Django (`api/` e `user/`) ficam na raiz do projeto, não dentro de `server/`. O `server/` contém apenas configurações do projeto Django.
+
+## Build e deploy do front via Django (SPA)
+
+- Dev:
+  - Backend: `python manage.py runserver`
+  - Frontend: `cd frontend && npm run dev`
+- Produção/local:
+  - `cd frontend && npm run build` (gera `dist/` e copia para `server/static/frontend/` e reescreve `server/templates/index.html`)
+  - `python manage.py runserver`
 
 ## Roadmap (incremental)
 
 - Ferramenta inicial: Blob (contagem por intervalo de intensidade/cor em ROI)
 - Tools: threshold, morfologia (erode/dilate/open/close), contornos, ROI, medição
 - Pipelines: execução síncrona (MVP) → assíncrona (jobs) quando necessário
-- Autenticação: sessão Django (mesmo domínio) ou JWT (separação/SSO)
+- Autenticação: sessão Django (já implementada no MVP) ou JWT (futuro)
 - Streaming: eventos via WebSocket; frames JPEG no MVP; evoluir para WebRTC/RTSP
 
 ## Scripts úteis
@@ -212,5 +164,3 @@ analyticLens/
 ## Licença
 
 Defina a licença conforme a necessidade do projeto (ex.: MIT, Apache-2.0).
-
-
