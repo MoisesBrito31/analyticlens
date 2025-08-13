@@ -19,7 +19,6 @@ Plataforma low-code/no-code para configurar inspeções visuais. O usuário mont
 - BootstrapVue 3 (UI)
 - Vue Flow (canvas do builder)
 - FormKit (formulários e configuração via schema)
-- Zod (validação em runtime)
 - ESLint (qualidade de código)
 - fetch (HTTP) centralizado em um pequeno wrapper
 
@@ -161,6 +160,4 @@ analyticLens/
   - `npm run dev`
   - `npm run build`
 
-## Licença
 
-Defina a licença conforme a necessidade do projeto (ex.: MIT, Apache-2.0).
