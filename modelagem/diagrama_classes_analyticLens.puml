@@ -1,0 +1,268 @@
+@startuml AnalyticLens_Class_Diagram
+
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classFontName Arial
+skinparam packageStyle rectangle
+
+' ========================================
+' PACKAGES
+' ========================================
+package "Frontend (Vue.js)" {
+  package "Components" {
+    class App {
+      + mounted()
+      + setup()
+    }
+    
+    class InspectionEditView {
+      + inspectionData: Object
+      + onPipelineUpdated()
+      + saveInspection()
+    }
+    
+    class ToolsCanvas {
+      + elements: Array
+      + selectedTool: Object
+      + selectedNode: Object
+      + addToolNode()
+      + selectNode()
+      + updateNodeParameters()
+      + savePipeline()
+    }
+    
+    class ToolProperties {
+      + tool: Object
+      + parameters: Object
+      + update()
+    }
+    
+    class ToolNode {
+      + data: Object
+      + position: Object
+      + selectNode()
+    }
+  }
+  
+  package "Stores (Pinia)" {
+    class AuthStore {
+      + user: Object
+      + isAuthenticated: Boolean
+      + login()
+      + logout()
+      + fetchUser()
+    }
+    
+    class ToolsStore {
+      + availableTools: Array
+      + selectedTool: Object
+      + fetchTools()
+      + selectTool()
+      + clearSelection()
+    }
+    
+    class InspectionsStore {
+      + inspections: Array
+      + createInspection()
+      + fetchInspections()
+      + updateInspection()
+      + deleteInspection()
+    }
+  }
+  
+  package "Utils" {
+    class Validation {
+      + VALIDATION_TYPES: Object
+      + validators: Object
+      + validateField()
+      + validateObject()
+      + createValidationRules()
+    }
+    
+    class HttpClient {
+      + baseURL: String
+      + get()
+      + post()
+      + put()
+      + delete()
+    }
+  }
+}
+
+package "Backend (Django)" {
+  package "Models" {
+    class User {
+      + username: String
+      + email: String
+      + first_name: String
+      + last_name: String
+      + is_active: Boolean
+      + date_joined: DateTime
+    }
+    
+    class ToolBase {
+      <<abstract>>
+      + name: String
+      + description: Text
+      + version: String
+      + is_active: Boolean
+      + parameters_schema: JSONField
+      + created_at: DateTime
+      + updated_at: DateTime
+      + get_parameters()
+    }
+    
+    class BlobDetectionTool {
+      + min_area: Integer
+      + max_area: Integer
+      + threshold_value: Integer
+      + get_parameters()
+    }
+    
+    class Inspection {
+      + name: String
+      + description: Text
+      + user: ForeignKey(User)
+      + is_active: Boolean
+      + pipeline_config: JSONField
+      + created_at: DateTime
+      + updated_at: DateTime
+    }
+    
+    class InspectionResult {
+      + inspection: ForeignKey(Inspection)
+      + image_path: String
+      + execution_time: Float
+      + success: Boolean
+      + error_message: Text
+      + results_data: JSONField
+      + created_at: DateTime
+    }
+    
+    class ToolExecution {
+      + inspection_result: ForeignKey(InspectionResult)
+      + tool_name: String
+      + tool_version: String
+      + execution_time: Float
+      + success: Boolean
+      + error_message: Text
+      + input_parameters: JSONField
+      + output_data: JSONField
+      + created_at: DateTime
+    }
+  }
+  
+  package "Views (DRF)" {
+    class ToolViewSet {
+      + list()
+      + retrieve()
+      + create()
+      + update()
+      + destroy()
+    }
+    
+    class InspectionViewSet {
+      + list()
+      + retrieve()
+      + create()
+      + update()
+      + destroy()
+    }
+    
+    class ToolExecutionView {
+      + execute_tool()
+      + get_tool_info()
+    }
+  }
+  
+  package "Serializers" {
+    class UserSerializer {
+      + fields: Array
+      + validate()
+    }
+    
+    class ToolSerializer {
+      + fields: Array
+      + validate()
+    }
+    
+    class InspectionSerializer {
+      + fields: Array
+      + validate()
+    }
+    
+    class InspectionResultSerializer {
+      + fields: Array
+      + validate()
+    }
+  }
+  
+  package "Tools Engine" {
+    class ToolRegistry {
+      + tools: Dict
+      + register_tool()
+      + get_tool()
+      + list_tools()
+    }
+    
+    class ToolExecutor {
+      + execute()
+      + validate_parameters()
+      + process_image()
+    }
+    
+    class ImageProcessor {
+      + load_image()
+      + preprocess()
+      + postprocess()
+      + save_result()
+    }
+  }
+}
+
+' ========================================
+' RELACIONAMENTOS
+' ========================================
+
+' Frontend Relationships
+App ||--o{ InspectionEditView : contains
+InspectionEditView ||--o{ ToolsCanvas : contains
+ToolsCanvas ||--o{ ToolNode : contains
+ToolsCanvas ||--o{ ToolProperties : contains
+
+' Store Relationships
+AuthStore ||--o{ App : provides
+ToolsStore ||--o{ ToolsCanvas : provides
+InspectionsStore ||--o{ InspectionEditView : provides
+
+' Backend Relationships
+User ||--o{ Inspection : creates
+Inspection ||--o{ InspectionResult : generates
+InspectionResult ||--o{ ToolExecution : contains
+ToolBase ||--o{ BlobDetectionTool : extends
+
+' View Relationships
+ToolViewSet ||--o{ ToolSerializer : uses
+InspectionViewSet ||--o{ InspectionSerializer : uses
+ToolExecutionView ||--o{ ToolRegistry : uses
+
+' Tool Engine Relationships
+ToolRegistry ||--o{ ToolBase : manages
+ToolExecutor ||--o{ ToolBase : executes
+ToolExecutor ||--o{ ImageProcessor : uses
+
+' Cross-layer Relationships
+ToolsStore ||--o{ ToolViewSet : communicates
+InspectionsStore ||--o{ InspectionViewSet : communicates
+ToolProperties ||--o{ ToolBase : configures
+
+' ========================================
+' NOTES
+' ========================================
+note top of ToolBase : "Classe abstrata base para todas as tools de visão computacional"
+note top of ToolRegistry : "Sistema centralizado para gerenciar tools disponíveis"
+note top of Validation : "Sistema de validação JavaScript puro (substitui Zod)"
+note top of ToolsCanvas : "Canvas visual para construção de pipelines de inspeção"
+
+@enduml

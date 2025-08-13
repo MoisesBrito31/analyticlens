@@ -1,0 +1,154 @@
+@startuml AnalyticLens_Component_Diagram
+
+!theme plain
+skinparam componentFontSize 12
+skinparam componentFontName Arial
+skinparam interfaceFontSize 10
+skinparam componentStyle rectangle
+skinparam componentBackgroundColor #E3F2FD
+skinparam interfaceBackgroundColor #FFF3E0
+skinparam databaseBackgroundColor #E8F5E8
+
+title "AnalyticLens - Arquitetura de Componentes"
+
+package "Frontend (Vue.js 3)" {
+  component "App.vue" as App
+  component "InspectionEditView.vue" as InspectionEditView
+  component "ToolsCanvas.vue" as ToolsCanvas
+  component "ToolProperties.vue" as ToolProperties
+  component "ToolNode.vue" as ToolNode
+  component "AppHeader.vue" as AppHeader
+  component "LoginView.vue" as LoginView
+  component "InspectionsView.vue" as InspectionsView
+  component "LiveView.vue" as LiveView
+  component "ImageLogView.vue" as ImageLogView
+  component "ConfigurationsView.vue" as ConfigurationsView
+}
+
+package "Stores (Pinia)" {
+  component "AuthStore" as AuthStore
+  component "ToolsStore" as ToolsStore
+  component "InspectionsStore" as InspectionsStore
+  component "CounterStore" as CounterStore
+}
+
+package "Utils & Services" {
+  component "Validation" as Validation
+  component "HttpClient" as HttpClient
+  component "Router" as Router
+}
+
+package "Backend (Django)" {
+  component "Django Server" as DjangoServer
+  component "URLs" as URLs
+  component "Middleware" as Middleware
+  component "Settings" as Settings
+}
+
+package "API (Django REST Framework)" {
+  component "ToolViewSet" as ToolViewSet
+  component "InspectionViewSet" as InspectionViewSet
+  component "ToolExecutionView" as ToolExecutionView
+  component "AuthView" as AuthView
+  component "Serializers" as Serializers
+}
+
+package "Models (Django ORM)" {
+  component "User Model" as UserModel
+  component "ToolBase Model" as ToolBaseModel
+  component "BlobDetectionTool Model" as BlobDetectionToolModel
+  component "Inspection Model" as InspectionModel
+  component "InspectionResult Model" as InspectionResultModel
+  component "ToolExecution Model" as ToolExecutionModel
+}
+
+package "Computer Vision Engine" {
+  component "ToolRegistry" as ToolRegistry
+  component "ToolExecutor" as ToolExecutor
+  component "ImageProcessor" as ImageProcessor
+  component "BlobDetectionTool" as BlobDetectionTool
+  component "EdgeDetectionTool" as EdgeDetectionTool
+  component "ColorFilterTool" as ColorFilterTool
+}
+
+package "Database" {
+  database "PostgreSQL" as PostgreSQL
+}
+
+package "External Dependencies" {
+  component "OpenCV (cv2)" as OpenCV
+  component "NumPy" as NumPy
+  component "Pillow (PIL)" as Pillow
+}
+
+' ========================================
+' INTERFACES E COMUNICAÇÕES
+' ========================================
+
+interface "HTTP REST API" as HTTPInterface
+interface "File Upload" as FileUploadInterface
+interface "Database Connection" as DBInterface
+
+' Frontend Communications
+App --> AuthStore : uses
+App --> Router : uses
+InspectionEditView --> ToolsCanvas : contains
+InspectionEditView --> ToolProperties : contains
+ToolsCanvas --> ToolNode : contains
+ToolsCanvas --> ToolsStore : uses
+InspectionEditView --> InspectionsStore : uses
+
+' Store Communications
+AuthStore --> HttpClient : uses
+ToolsStore --> HttpClient : uses
+InspectionsStore --> HttpClient : uses
+
+' Backend Communications
+DjangoServer --> URLs : uses
+URLs --> ToolViewSet : routes
+URLs --> InspectionViewSet : routes
+URLs --> ToolExecutionView : routes
+URLs --> AuthView : routes
+
+' API Communications
+ToolViewSet --> Serializers : uses
+InspectionViewSet --> Serializers : uses
+ToolExecutionView --> ToolRegistry : uses
+
+' Model Communications
+ToolViewSet --> UserModel : queries
+InspectionViewSet --> InspectionModel : queries
+ToolExecutionView --> InspectionResultModel : queries
+
+' CV Engine Communications
+ToolRegistry --> BlobDetectionTool : manages
+ToolRegistry --> EdgeDetectionTool : manages
+ToolRegistry --> ColorFilterTool : manages
+ToolExecutor --> ImageProcessor : uses
+
+' Database Communications
+UserModel --> PostgreSQL : stores
+ToolBaseModel --> PostgreSQL : stores
+InspectionModel --> PostgreSQL : stores
+InspectionResultModel --> PostgreSQL : stores
+ToolExecutionModel --> PostgreSQL : stores
+
+' External Dependencies
+ImageProcessor --> OpenCV : uses
+ImageProcessor --> NumPy : uses
+ImageProcessor --> Pillow : uses
+
+' Cross-layer Communications
+HttpClient --> HTTPInterface : communicates
+ToolsCanvas --> FileUploadInterface : uses
+DjangoServer --> DBInterface : connects
+
+' ========================================
+' NOTES
+' ========================================
+note top of Validation : "Sistema de validação\nJavaScript puro\n(substitui Zod)"
+note top of ToolRegistry : "Sistema centralizado\npara gerenciar tools"
+note top of PostgreSQL : "Banco principal\ncom todas as entidades"
+note top of OpenCV : "Biblioteca principal\npara visão computacional"
+
+@enduml

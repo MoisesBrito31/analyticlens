@@ -1,0 +1,128 @@
+@startuml AnalyticLens_Activity_Diagram
+
+!theme plain
+skinparam activityFontSize 12
+skinparam activityFontName Arial
+skinparam activityDiamondFontSize 10
+skinparam activityArrowThickness 2
+skinparam activityStartColor #4CAF50
+skinparam activityEndColor #F44336
+skinparam activityColor #2196F3
+skinparam activityDiamondColor #FF9800
+
+title "AnalyticLens - Workflow do Pipeline de Inspeção"
+
+start
+
+:Usuário acessa aplicação;
+
+if (Usuário autenticado?) then (sim)
+  :Carrega tools disponíveis;
+  :Exibe interface de criação;
+  
+  :Usuário cria nova inspeção;
+  
+  fork
+    :Seleciona tool Image Source;
+    :Configura parâmetros;
+    if (Tipo de fonte?) then (URL)
+      :Insere URL da imagem;
+      :Valida URL;
+    else (Upload)
+      :Seleciona arquivo;
+      :Valida formato;
+      :Processa arquivo;
+    endif
+    :Adiciona ao canvas;
+  fork again
+    :Seleciona tools de processamento;
+    :Configura parâmetros;
+    :Adiciona ao canvas;
+  end fork
+  
+  :Conecta tools no pipeline;
+  
+  if (Pipeline válido?) then (sim)
+    :Salva inspeção;
+    
+    if (Executar agora?) then (sim)
+      :Inicia execução;
+      
+      :Carrega imagem fonte;
+      
+      while (Tool na sequência?) is (sim)
+        :Executa tool atual;
+        :Valida parâmetros;
+        
+        if (Tool é Image Source?) then (sim)
+          :Carrega imagem;
+          :Prepara dados;
+        else (Tool de processamento)
+          :Aplica algoritmo;
+          :Processa imagem;
+          :Gera resultados;
+        endif
+        
+        :Salva resultado intermediário;
+        :Prepara dados para próxima tool;
+      endwhile (não)
+      
+      :Finaliza execução;
+      :Gera relatório;
+      
+      fork
+        :Exibe imagem processada;
+      fork again
+        :Exibe métricas;
+      fork again
+        :Exibe áreas detectadas;
+      end fork
+      
+      :Salva resultado final;
+      
+    else (não)
+      :Inspeção salva como rascunho;
+    endif
+    
+  else (não)
+    :Exibe erros de validação;
+    :Solicita correções;
+    :Retorna à configuração;
+  endif
+  
+else (não)
+  :Redireciona para login;
+  :Usuário faz login;
+  :Retorna ao início;
+endif
+
+:Exibe histórico de inspeções;
+
+if (Usuário quer continuar?) then (sim)
+  :Cria nova inspeção;
+else (não)
+  stop
+endif
+
+note right
+  Validação JavaScript puro:
+  - Parâmetros obrigatórios
+  - Conexões entre tools
+  - Formato de imagem
+end note
+
+note right
+  Arquitetura modular:
+  - ToolRegistry gerencia tools
+  - ToolExecutor executa
+  - ImageProcessor processa
+end note
+
+note right
+  Persistência:
+  - InspectionResult
+  - ToolExecution logs
+  - Dados processados
+end note
+
+@enduml

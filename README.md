@@ -125,6 +125,13 @@ analyticLens/
 │  ├─ settings.py        # configuração Django
 │  └─ urls.py            # roteamento principal
 ├─ user/                 # app de autenticação (User custom + endpoints /api/auth/*)
+├─ modelagem/            # Documentação UML e modelagem do sistema
+│  ├─ diagrama_classes_analyticLens.puml
+│  ├─ diagrama_sequencia_analyticLens.puml
+│  ├─ diagrama_atividades_analyticLens.puml
+│  ├─ diagrama_componentes_analyticLens.puml
+│  ├─ diagrama_casos_uso_analyticLens.puml
+│  └─ proposta de tecnologias.txt
 ├─ manage.py             # Django CLI
 ├─ db.sqlite3            # banco SQLite (gerado)
 ├─ .gitignore            # arquivos ignorados pelo Git
@@ -142,6 +149,50 @@ analyticLens/
 - Produção/local:
   - `cd frontend && npm run build` (gera `dist/` e copia para `server/static/frontend/` e reescreve `server/templates/index.html`)
   - `python manage.py runserver`
+
+## Modelagem do Sistema
+
+### 📊 Diagramas UML
+
+O projeto inclui uma documentação completa de modelagem UML na pasta `modelagem/`:
+
+#### **🏗️ Diagrama de Classes**
+- **Arquivo**: `diagrama_classes_analyticLens.puml`
+- **Propósito**: Estrutura do sistema, modelos de dados, relacionamentos entre entidades
+- **Cobertura**: Django models, Vue components, Pinia stores, Computer Vision tools
+
+#### **🔄 Diagrama de Sequência**
+- **Arquivo**: `diagrama_sequencia_analyticLens.puml`
+- **Propósito**: Fluxo de execução das inspeções, interação entre componentes
+- **Cobertura**: Pipeline de execução, comunicação Frontend ↔ Backend, processamento de imagens
+
+#### **⚙️ Diagrama de Atividades**
+- **Arquivo**: `diagrama_atividades_analyticLens.puml`
+- **Propósito**: Workflow do pipeline de inspeção, decisões e processos paralelos
+- **Cobertura**: Fluxo completo desde upload até resultado, validações e loops
+
+#### **🏛️ Diagrama de Componentes**
+- **Arquivo**: `diagrama_componentes_analyticLens.puml`
+- **Propósito**: Arquitetura do sistema, componentes principais e suas interações
+- **Cobertura**: Frontend Vue.js, Backend Django, Computer Vision Engine, Database
+
+#### **🎭 Diagrama de Casos de Uso**
+- **Arquivo**: `diagrama_casos_uso_analyticLens.puml`
+- **Propósito**: Funcionalidades do sistema, atores e suas responsabilidades
+- **Cobertura**: 8 pacotes de funcionalidades, 50+ casos de uso, relacionamentos include/extend
+
+### 🎨 Como Visualizar
+
+Os diagramas estão em formato PlantUML (`.puml`) e podem ser visualizados:
+
+1. **Online**: https://www.plantuml.com/plantuml/uml/
+2. **VS Code**: Extensão "PlantUML" (jebbs.plantuml)
+3. **Desktop**: PlantUML.jar com Java instalado
+
+### 📋 Documentação Adicional
+
+- **`proposta de tecnologias.txt`**: Análise inicial das tecnologias escolhidas
+- **Todos os diagramas testados** e funcionando no PlantUML Online
 
 ## Roadmap (incremental)
 

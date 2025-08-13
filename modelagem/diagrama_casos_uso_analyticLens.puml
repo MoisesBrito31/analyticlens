@@ -1,0 +1,242 @@
+@startuml AnalyticLens_Use_Case_Diagram
+
+!theme plain
+skinparam usecaseFontSize 12
+skinparam usecaseFontName Arial
+skinparam actorFontSize 11
+skinparam usecaseBackgroundColor #E8F5E8
+skinparam actorBackgroundColor #FFF3E0
+skinparam packageBackgroundColor #E3F2FD
+
+title "AnalyticLens - Diagrama de Casos de Uso"
+
+' ========================================
+' ATORES
+' ========================================
+actor "Usuário" as User
+actor "Administrador" as Admin
+actor "Sistema" as System
+
+' ========================================
+' CASOS DE USO PRINCIPAIS
+' ========================================
+package "Autenticação e Usuário" {
+  usecase "Fazer Login" as UC_Login
+  usecase "Fazer Logout" as UC_Logout
+  usecase "Gerenciar Perfil" as UC_Profile
+  usecase "Alterar Senha" as UC_ChangePassword
+  usecase "Recuperar Senha" as UC_RecoverPassword
+}
+
+package "Gestão de Inspeções" {
+  usecase "Criar Nova Inspeção" as UC_CreateInspection
+  usecase "Editar Inspeção" as UC_EditInspection
+  usecase "Visualizar Inspeção" as UC_ViewInspection
+  usecase "Listar Inspeções" as UC_ListInspections
+  usecase "Excluir Inspeção" as UC_DeleteInspection
+  usecase "Duplicar Inspeção" as UC_DuplicateInspection
+  usecase "Arquivar Inspeção" as UC_ArchiveInspection
+}
+
+package "Pipeline de Tools" {
+  usecase "Selecionar Tool" as UC_SelectTool
+  usecase "Configurar Parâmetros" as UC_ConfigureParams
+  usecase "Adicionar Tool ao Canvas" as UC_AddToolToCanvas
+  usecase "Conectar Tools" as UC_ConnectTools
+  usecase "Remover Tool" as UC_RemoveTool
+  usecase "Reordenar Tools" as UC_ReorderTools
+  usecase "Validar Pipeline" as UC_ValidatePipeline
+  usecase "Salvar Pipeline" as UC_SavePipeline
+}
+
+package "Processamento de Imagem" {
+  usecase "Upload de Imagem" as UC_UploadImage
+  usecase "Inserir URL de Imagem" as UC_InsertImageURL
+  usecase "Executar Pipeline" as UC_ExecutePipeline
+  usecase "Visualizar Resultado" as UC_ViewResult
+  usecase "Exportar Resultado" as UC_ExportResult
+  usecase "Comparar Resultados" as UC_CompareResults
+  usecase "Aplicar Filtros" as UC_ApplyFilters
+}
+
+package "Computer Vision Tools" {
+  usecase "Usar Blob Detection" as UC_BlobDetection
+  usecase "Usar Edge Detection" as UC_EdgeDetection
+  usecase "Usar Color Filter" as UC_ColorFilter
+  usecase "Usar Image Source" as UC_ImageSource
+  usecase "Configurar Threshold" as UC_ConfigureThreshold
+  usecase "Ajustar Parâmetros" as UC_AdjustParameters
+  usecase "Preview de Tool" as UC_ToolPreview
+}
+
+package "Monitoramento e Análise" {
+  usecase "Monitorar em Tempo Real" as UC_RealTimeMonitoring
+  usecase "Visualizar Histórico" as UC_ViewHistory
+  usecase "Gerar Relatórios" as UC_GenerateReports
+  usecase "Analisar Estatísticas" as UC_AnalyzeStats
+  usecase "Configurar Alertas" as UC_ConfigureAlerts
+  usecase "Exportar Dados" as UC_ExportData
+}
+
+package "Configurações e Administração" {
+  usecase "Configurar Sistema" as UC_ConfigureSystem
+  usecase "Gerenciar Usuários" as UC_ManageUsers
+  usecase "Configurar Permissões" as UC_ConfigurePermissions
+  usecase "Backup de Dados" as UC_BackupData
+  usecase "Restaurar Dados" as UC_RestoreData
+  usecase "Configurar Notificações" as UC_ConfigureNotifications
+  usecase "Gerenciar Logs" as UC_ManageLogs
+}
+
+package "Suporte e Ajuda" {
+  usecase "Acessar Documentação" as UC_AccessDocs
+  usecase "Solicitar Suporte" as UC_RequestSupport
+  usecase "Reportar Bug" as UC_ReportBug
+  usecase "Sugerir Melhorias" as UC_SuggestImprovements
+  usecase "Ver Tutorial" as UC_ViewTutorial
+}
+
+' ========================================
+' RELACIONAMENTOS PRINCIPAIS
+' ========================================
+
+' Usuário - Casos de Uso Básicos
+User --> UC_Login
+User --> UC_Logout
+User --> UC_Profile
+User --> UC_ChangePassword
+User --> UC_RecoverPassword
+
+' Usuário - Gestão de Inspeções
+User --> UC_CreateInspection
+User --> UC_EditInspection
+User --> UC_ViewInspection
+User --> UC_ListInspections
+User --> UC_DeleteInspection
+User --> UC_DuplicateInspection
+
+' Usuário - Pipeline
+User --> UC_SelectTool
+User --> UC_ConfigureParams
+User --> UC_AddToolToCanvas
+User --> UC_ConnectTools
+User --> UC_RemoveTool
+User --> UC_ReorderTools
+User --> UC_ValidatePipeline
+User --> UC_SavePipeline
+
+' Usuário - Processamento
+User --> UC_UploadImage
+User --> UC_InsertImageURL
+User --> UC_ExecutePipeline
+User --> UC_ViewResult
+User --> UC_ExportResult
+User --> UC_CompareResults
+
+' Usuário - Tools
+User --> UC_BlobDetection
+User --> UC_EdgeDetection
+User --> UC_ColorFilter
+User --> UC_ImageSource
+User --> UC_ConfigureThreshold
+User --> UC_AdjustParameters
+User --> UC_ToolPreview
+
+' Usuário - Monitoramento
+User --> UC_RealTimeMonitoring
+User --> UC_ViewHistory
+User --> UC_GenerateReports
+User --> UC_AnalyzeStats
+User --> UC_ExportData
+
+' Usuário - Suporte
+User --> UC_AccessDocs
+User --> UC_RequestSupport
+User --> UC_ReportBug
+User --> UC_SuggestImprovements
+User --> UC_ViewTutorial
+
+' Administrador - Casos de Uso Avançados
+Admin --> UC_ManageUsers
+Admin --> UC_ConfigurePermissions
+Admin --> UC_BackupData
+Admin --> UC_RestoreData
+Admin --> UC_ConfigureSystem
+Admin --> UC_ConfigureNotifications
+Admin --> UC_ManageLogs
+
+' Sistema - Casos de Uso Automáticos
+System --> UC_ValidatePipeline
+System --> UC_ConfigureAlerts
+System --> UC_BackupData
+
+' ========================================
+' RELACIONAMENTOS DE INCLUSÃO/EXTENSÃO
+' ========================================
+
+' Inclusões (include)
+UC_CreateInspection ..> UC_SelectTool : <<include>>
+UC_CreateInspection ..> UC_ConfigureParams : <<include>>
+UC_CreateInspection ..> UC_AddToolToCanvas : <<include>>
+UC_CreateInspection ..> UC_ConnectTools : <<include>>
+UC_CreateInspection ..> UC_ValidatePipeline : <<include>>
+UC_CreateInspection ..> UC_SavePipeline : <<include>>
+
+UC_ExecutePipeline ..> UC_ValidatePipeline : <<include>>
+UC_ExecutePipeline ..> UC_ViewResult : <<include>>
+
+UC_EditInspection ..> UC_ConfigureParams : <<include>>
+UC_EditInspection ..> UC_ValidatePipeline : <<include>>
+
+UC_SelectTool ..> UC_ConfigureParams : <<include>>
+UC_AddToolToCanvas ..> UC_ConfigureParams : <<include>>
+
+UC_BlobDetection ..> UC_ConfigureThreshold : <<include>>
+UC_EdgeDetection ..> UC_ConfigureThreshold : <<include>>
+UC_ColorFilter ..> UC_ConfigureThreshold : <<include>>
+
+UC_RealTimeMonitoring ..> UC_ConfigureAlerts : <<include>>
+UC_ViewHistory ..> UC_GenerateReports : <<include>>
+
+' Extensões (extend)
+UC_ConfigureParams ..> UC_ToolPreview : <<extend>>
+UC_ExecutePipeline ..> UC_ApplyFilters : <<extend>>
+UC_ViewResult ..> UC_ExportResult : <<extend>>
+UC_ViewResult ..> UC_CompareResults : <<extend>>
+
+UC_ConfigureSystem ..> UC_ConfigureNotifications : <<extend>>
+UC_ConfigureSystem ..> UC_ConfigurePermissions : <<extend>>
+
+UC_RequestSupport ..> UC_ReportBug : <<extend>>
+UC_RequestSupport ..> UC_SuggestImprovements : <<extend>>
+
+' ========================================
+' RELACIONAMENTOS DE GENERALIZAÇÃO
+' ========================================
+
+' Herança de casos de uso
+UC_BlobDetection --|> UC_ConfigureThreshold
+UC_EdgeDetection --|> UC_ConfigureThreshold
+UC_ColorFilter --|> UC_ConfigureThreshold
+
+UC_UploadImage --|> UC_ConfigureParams
+UC_InsertImageURL --|> UC_ConfigureParams
+
+UC_GenerateReports --|> UC_ExportData
+UC_ViewHistory --|> UC_ExportData
+
+' ========================================
+' NOTES E COMENTÁRIOS
+' ========================================
+note right of UC_Login : "Autenticação via\nDjango REST Framework"
+note right of UC_ValidatePipeline : "Validação JavaScript puro\n(substitui Zod)"
+note right of UC_ExecutePipeline : "Execução via\nToolRegistry"
+note right of UC_ConfigureParams : "Interface dinâmica\nbaseada no schema"
+note right of UC_RealTimeMonitoring : "WebSocket para\ndados em tempo real"
+note right of UC_BackupData : "Automático diário\n+ manual sob demanda"
+
+note top of "Pipeline de Tools" : "Canvas visual para\nconstrução de pipelines"
+note top of "Computer Vision Tools" : "Arquitetura modular\ne extensível"
+note top of "Monitoramento e Análise" : "Dashboard em tempo real\n+ histórico completo"
+
+@enduml
