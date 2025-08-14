@@ -8,7 +8,7 @@ skinparam usecaseBackgroundColor #E8F5E8
 skinparam actorBackgroundColor #FFF3E0
 skinparam packageBackgroundColor #E3F2FD
 
-title "AnalyticLens - Diagrama de Casos de Uso"
+title "AnalyticLens - Diagrama de Casos de Uso (Arquitetura Distribuída)"
 
 ' ========================================
 ' ATORES
@@ -16,6 +16,7 @@ title "AnalyticLens - Diagrama de Casos de Uso"
 actor "Usuário" as User
 actor "Administrador" as Admin
 actor "Sistema" as System
+actor "Máquina de Visão" as MV
 
 ' ========================================
 ' CASOS DE USO PRINCIPAIS
@@ -28,7 +29,18 @@ package "Autenticação e Usuário" {
   usecase "Recuperar Senha" as UC_RecoverPassword
 }
 
-package "Gestão de Inspeções" {
+package "Gestão de Máquinas de Visão" {
+  usecase "Cadastrar Máquina" as UC_RegisterMachine
+  usecase "Configurar Máquina" as UC_ConfigureMachine
+  usecase "Monitorar Status" as UC_MonitorMachineStatus
+  usecase "Visualizar Heartbeat" as UC_ViewHeartbeat
+  usecase "Gerenciar IP Whitelist" as UC_ManageIPWhitelist
+  usecase "Gerar Token Público" as UC_GeneratePublicToken
+  usecase "Remover Máquina" as UC_RemoveMachine
+  usecase "Visualizar Capacidades" as UC_ViewMachineCapabilities
+}
+
+package "Gestão de Inspeções Distribuídas" {
   usecase "Criar Nova Inspeção" as UC_CreateInspection
   usecase "Editar Inspeção" as UC_EditInspection
   usecase "Visualizar Inspeção" as UC_ViewInspection
@@ -36,6 +48,10 @@ package "Gestão de Inspeções" {
   usecase "Excluir Inspeção" as UC_DeleteInspection
   usecase "Duplicar Inspeção" as UC_DuplicateInspection
   usecase "Arquivar Inspeção" as UC_ArchiveInspection
+  usecase "Enviar para Máquina" as UC_SendToMachine
+  usecase "Distribuir Automaticamente" as UC_AutoDistribute
+  usecase "Monitorar Progresso" as UC_MonitorProgress
+  usecase "Coletar Resultados" as UC_CollectResults
 }
 
 package "Pipeline de Tools" {
@@ -76,6 +92,8 @@ package "Monitoramento e Análise" {
   usecase "Analisar Estatísticas" as UC_AnalyzeStats
   usecase "Configurar Alertas" as UC_ConfigureAlerts
   usecase "Exportar Dados" as UC_ExportData
+  usecase "Dashboard de Máquinas" as UC_MachineDashboard
+  usecase "Monitorar Performance" as UC_MonitorPerformance
 }
 
 package "Configurações e Administração" {
@@ -86,6 +104,7 @@ package "Configurações e Administração" {
   usecase "Restaurar Dados" as UC_RestoreData
   usecase "Configurar Notificações" as UC_ConfigureNotifications
   usecase "Gerenciar Logs" as UC_ManageLogs
+  usecase "Configurar Segurança" as UC_ConfigureSecurity
 }
 
 package "Suporte e Ajuda" {
@@ -107,6 +126,14 @@ User --> UC_Profile
 User --> UC_ChangePassword
 User --> UC_RecoverPassword
 
+' Usuário - Gestão de Máquinas
+User --> UC_RegisterMachine
+User --> UC_ConfigureMachine
+User --> UC_MonitorMachineStatus
+User --> UC_ViewHeartbeat
+User --> UC_ManageIPWhitelist
+User --> UC_ViewMachineCapabilities
+
 ' Usuário - Gestão de Inspeções
 User --> UC_CreateInspection
 User --> UC_EditInspection
@@ -114,6 +141,8 @@ User --> UC_ViewInspection
 User --> UC_ListInspections
 User --> UC_DeleteInspection
 User --> UC_DuplicateInspection
+User --> UC_SendToMachine
+User --> UC_MonitorProgress
 
 ' Usuário - Pipeline
 User --> UC_SelectTool
@@ -148,6 +177,8 @@ User --> UC_ViewHistory
 User --> UC_GenerateReports
 User --> UC_AnalyzeStats
 User --> UC_ExportData
+User --> UC_MachineDashboard
+User --> UC_MonitorPerformance
 
 ' Usuário - Suporte
 User --> UC_AccessDocs
@@ -164,11 +195,20 @@ Admin --> UC_RestoreData
 Admin --> UC_ConfigureSystem
 Admin --> UC_ConfigureNotifications
 Admin --> UC_ManageLogs
+Admin --> UC_ConfigureSecurity
+Admin --> UC_RemoveMachine
+Admin --> UC_GeneratePublicToken
 
 ' Sistema - Casos de Uso Automáticos
 System --> UC_ValidatePipeline
 System --> UC_ConfigureAlerts
 System --> UC_BackupData
+System --> UC_AutoDistribute
+System --> UC_CollectResults
+
+' Máquina de Visão - Casos de Uso
+MV --> UC_ViewHeartbeat
+MV --> UC_MonitorMachineStatus
 
 ' ========================================
 ' RELACIONAMENTOS DE INCLUSÃO/EXTENSÃO
@@ -198,6 +238,12 @@ UC_ColorFilter ..> UC_ConfigureThreshold : <<include>>
 UC_RealTimeMonitoring ..> UC_ConfigureAlerts : <<include>>
 UC_ViewHistory ..> UC_GenerateReports : <<include>>
 
+UC_RegisterMachine ..> UC_GeneratePublicToken : <<include>>
+UC_RegisterMachine ..> UC_ManageIPWhitelist : <<include>>
+UC_SendToMachine ..> UC_ValidatePipeline : <<include>>
+UC_SendToMachine ..> UC_MonitorProgress : <<include>>
+UC_AutoDistribute ..> UC_CollectResults : <<include>>
+
 ' Extensões (extend)
 UC_ConfigureParams ..> UC_ToolPreview : <<extend>>
 UC_ExecutePipeline ..> UC_ApplyFilters : <<extend>>
@@ -206,9 +252,13 @@ UC_ViewResult ..> UC_CompareResults : <<extend>>
 
 UC_ConfigureSystem ..> UC_ConfigureNotifications : <<extend>>
 UC_ConfigureSystem ..> UC_ConfigurePermissions : <<extend>>
+UC_ConfigureSystem ..> UC_ConfigureSecurity : <<extend>>
 
 UC_RequestSupport ..> UC_ReportBug : <<extend>>
 UC_RequestSupport ..> UC_SuggestImprovements : <<extend>>
+
+UC_MonitorMachineStatus ..> UC_ViewHeartbeat : <<extend>>
+UC_MachineDashboard ..> UC_MonitorPerformance : <<extend>>
 
 ' ========================================
 ' RELACIONAMENTOS DE GENERALIZAÇÃO
@@ -225,18 +275,26 @@ UC_InsertImageURL --|> UC_ConfigureParams
 UC_GenerateReports --|> UC_ExportData
 UC_ViewHistory --|> UC_ExportData
 
+UC_RegisterMachine --|> UC_ConfigureMachine
+UC_ConfigureMachine --|> UC_ManageIPWhitelist
+
 ' ========================================
 ' NOTES E COMENTÁRIOS
 ' ========================================
 note right of UC_Login : "Autenticação via\nDjango REST Framework"
 note right of UC_ValidatePipeline : "Validação JavaScript puro\n(substitui Zod)"
-note right of UC_ExecutePipeline : "Execução via\nToolRegistry"
+note right of UC_ExecutePipeline : "Execução distribuída\nvia máquinas Flask"
 note right of UC_ConfigureParams : "Interface dinâmica\nbaseada no schema"
 note right of UC_RealTimeMonitoring : "WebSocket para\ndados em tempo real"
 note right of UC_BackupData : "Automático diário\n+ manual sob demanda"
+note right of UC_RegisterMachine : "Cadastro manual com\nIP Whitelist + Token"
+note right of UC_SendToMachine : "Distribuição inteligente\nbaseada em capacidade"
+note right of UC_CollectResults : "Webhook para receber\nresultados das MVs"
 
+note top of "Gestão de Máquinas de Visão" : "Cadastro manual e\nmonitoramento em tempo real"
+note top of "Gestão de Inspeções Distribuídas" : "Distribuição automática\npara MVs disponíveis"
 note top of "Pipeline de Tools" : "Canvas visual para\nconstrução de pipelines"
 note top of "Computer Vision Tools" : "Arquitetura modular\ne extensível"
-note top of "Monitoramento e Análise" : "Dashboard em tempo real\n+ histórico completo"
+note top of "Monitoramento e Análise" : "Dashboard centralizado\n+ histórico completo"
 
 @enduml

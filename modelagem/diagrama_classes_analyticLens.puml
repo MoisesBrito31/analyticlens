@@ -16,10 +16,28 @@ package "Frontend (Vue.js)" {
       + setup()
     }
     
+    class DashboardView {
+      + machines: Array
+      + inspections: Array
+      + systemStatus: Object
+      + refreshData()
+    }
+    
+    class MachineManagementView {
+      + machines: Array
+      + selectedMachine: Object
+      + addMachine()
+      + editMachine()
+      + removeMachine()
+      + viewMachineStatus()
+    }
+    
     class InspectionEditView {
       + inspectionData: Object
+      + selectedMachine: Object
       + onPipelineUpdated()
       + saveInspection()
+      + sendToMachine()
     }
     
     class ToolsCanvas {
@@ -54,6 +72,16 @@ package "Frontend (Vue.js)" {
       + fetchUser()
     }
     
+    class MachinesStore {
+      + machines: Array
+      + selectedMachine: Object
+      + fetchMachines()
+      + addMachine()
+      + updateMachine()
+      + removeMachine()
+      + getMachineStatus()
+    }
+    
     class ToolsStore {
       + availableTools: Array
       + selectedTool: Object
@@ -68,6 +96,8 @@ package "Frontend (Vue.js)" {
       + fetchInspections()
       + updateInspection()
       + deleteInspection()
+      + sendToMachine()
+      + getResults()
     }
   }
   
@@ -90,7 +120,7 @@ package "Frontend (Vue.js)" {
   }
 }
 
-package "Backend (Django)" {
+package "Backend (Django - Orquestrador)" {
   package "Models" {
     class User {
       + username: String
@@ -99,6 +129,58 @@ package "Backend (Django)" {
       + last_name: String
       + is_active: Boolean
       + date_joined: DateTime
+    }
+    
+    class InspectionMachine {
+      + id: UUID
+      + name: String
+      + location: String
+      + ip_address: GenericIPAddressField
+      + port: Integer
+      + status: String
+      + last_heartbeat: DateTime
+      + max_concurrent_inspections: Integer
+      + current_inspections: Integer
+      + supported_inspection_types: JSONField
+      + hardware_specs: JSONField
+      + public_token: String
+      + ip_whitelist: Array
+      + is_available: Boolean
+      + api_url: String
+    }
+    
+    class MachineHeartbeat {
+      + machine: ForeignKey(InspectionMachine)
+      + timestamp: DateTime
+      + status: String
+      + system_info: JSONField
+      + performance_metrics: JSONField
+    }
+    
+    class DistributedInspection {
+      + id: UUID
+      + machine: ForeignKey(InspectionMachine)
+      + image: ImageField
+      + inspection_type: String
+      + status: String
+      + pipeline_config: JSONField
+      + created_at: DateTime
+      + assigned_at: DateTime
+      + started_at: DateTime
+      + completed_at: DateTime
+      + results: JSONField
+      + error_message: Text
+      + processing_time: Float
+      + assign_to_machine()
+      + mark_as_processing()
+      + mark_as_completed()
+      + mark_as_failed()
+    }
+    
+    class InspectionQueue {
+      + inspection: OneToOneField(DistributedInspection)
+      + priority: Integer
+      + queued_at: DateTime
     }
     
     class ToolBase {
@@ -120,18 +202,8 @@ package "Backend (Django)" {
       + get_parameters()
     }
     
-    class Inspection {
-      + name: String
-      + description: Text
-      + user: ForeignKey(User)
-      + is_active: Boolean
-      + pipeline_config: JSONField
-      + created_at: DateTime
-      + updated_at: DateTime
-    }
-    
     class InspectionResult {
-      + inspection: ForeignKey(Inspection)
+      + inspection: ForeignKey(DistributedInspection)
       + image_path: String
       + execution_time: Float
       + success: Boolean
@@ -139,27 +211,17 @@ package "Backend (Django)" {
       + results_data: JSONField
       + created_at: DateTime
     }
-    
-    class ToolExecution {
-      + inspection_result: ForeignKey(InspectionResult)
-      + tool_name: String
-      + tool_version: String
-      + execution_time: Float
-      + success: Boolean
-      + error_message: Text
-      + input_parameters: JSONField
-      + output_data: JSONField
-      + created_at: DateTime
-    }
   }
   
   package "Views (DRF)" {
-    class ToolViewSet {
+    class MachineViewSet {
       + list()
       + retrieve()
       + create()
       + update()
       + destroy()
+      + get_status()
+      + get_heartbeat()
     }
     
     class InspectionViewSet {
@@ -168,11 +230,21 @@ package "Backend (Django)" {
       + create()
       + update()
       + destroy()
+      + send_to_machine()
+      + get_results()
     }
     
-    class ToolExecutionView {
-      + execute_tool()
-      + get_tool_info()
+    class MachineOrchestratorView {
+      + discover_machines()
+      + distribute_inspection()
+      + collect_results()
+      + manage_queue()
+    }
+    
+    class WebhookReceiverView {
+      + receive_results()
+      + receive_heartbeat()
+      + receive_status_update()
     }
   }
   
@@ -182,12 +254,12 @@ package "Backend (Django)" {
       + validate()
     }
     
-    class ToolSerializer {
+    class InspectionMachineSerializer {
       + fields: Array
       + validate()
     }
     
-    class InspectionSerializer {
+    class DistributedInspectionSerializer {
       + fields: Array
       + validate()
     }
@@ -198,18 +270,84 @@ package "Backend (Django)" {
     }
   }
   
-  package "Tools Engine" {
+  package "Orchestration Engine" {
+    class MachineManager {
+      + machines: Dict
+      + register_machine()
+      + get_machine()
+      + list_machines()
+      + update_machine_status()
+    }
+    
+    class TaskDistributor {
+      + distribute_inspection()
+      + select_best_machine()
+      + manage_queue()
+      + handle_failures()
+    }
+    
+    class SecurityManager {
+      + validate_token()
+      + validate_ip()
+      + generate_session_token()
+      + manage_authentication()
+    }
+  }
+}
+
+package "Máquinas de Visão (Flask)" {
+  package "API Endpoints" {
+    class FlaskApp {
+      + app: Flask
+      + run()
+      + register_blueprints()
+    }
+    
+    class MachineAPI {
+      + /heartbeat
+      + /status
+      + /receive_inspection
+      + /send_results
+      + /update_config
+    }
+    
+    class WebhookHandler {
+      + handle_heartbeat()
+      + handle_status_update()
+      + handle_inspection_received()
+      + handle_results_sent()
+    }
+  }
+  
+  package "Security" {
+    class AuthenticationMiddleware {
+      + validate_request()
+      + check_ip_whitelist()
+      + verify_public_token()
+      + generate_session_token()
+    }
+    
+    class SecurityConfig {
+      + ip_whitelist: Array
+      + public_token: String
+      + session_token: String
+      + token_expiration: DateTime
+    }
+  }
+  
+  package "Inspection Engine" {
+    class InspectionExecutor {
+      + execute_inspection()
+      + load_pipeline_config()
+      + run_tools()
+      + collect_results()
+    }
+    
     class ToolRegistry {
       + tools: Dict
       + register_tool()
       + get_tool()
       + list_tools()
-    }
-    
-    class ToolExecutor {
-      + execute()
-      + validate_parameters()
-      + process_image()
     }
     
     class ImageProcessor {
@@ -219,6 +357,23 @@ package "Backend (Django)" {
       + save_result()
     }
   }
+  
+  package "Communication" {
+    class DjangoCommunicator {
+      + django_url: String
+      + session_token: String
+      + send_heartbeat()
+      + send_results()
+      + send_status()
+    }
+    
+    class HeartbeatService {
+      + interval: Integer
+      + start()
+      + stop()
+      + send_heartbeat()
+    }
+  }
 }
 
 ' ========================================
@@ -226,6 +381,8 @@ package "Backend (Django)" {
 ' ========================================
 
 ' Frontend Relationships
+App ||--o{ DashboardView : contains
+App ||--o{ MachineManagementView : contains
 App ||--o{ InspectionEditView : contains
 InspectionEditView ||--o{ ToolsCanvas : contains
 ToolsCanvas ||--o{ ToolNode : contains
@@ -233,36 +390,55 @@ ToolsCanvas ||--o{ ToolProperties : contains
 
 ' Store Relationships
 AuthStore ||--o{ App : provides
+MachinesStore ||--o{ MachineManagementView : provides
+MachinesStore ||--o{ DashboardView : provides
 ToolsStore ||--o{ ToolsCanvas : provides
 InspectionsStore ||--o{ InspectionEditView : provides
 
 ' Backend Relationships
-User ||--o{ Inspection : creates
-Inspection ||--o{ InspectionResult : generates
-InspectionResult ||--o{ ToolExecution : contains
+User ||--o{ DistributedInspection : creates
+InspectionMachine ||--o{ DistributedInspection : processes
+InspectionMachine ||--o{ MachineHeartbeat : generates
+DistributedInspection ||--o{ InspectionResult : generates
+DistributedInspection ||--o{ InspectionQueue : queued
 ToolBase ||--o{ BlobDetectionTool : extends
 
 ' View Relationships
-ToolViewSet ||--o{ ToolSerializer : uses
-InspectionViewSet ||--o{ InspectionSerializer : uses
-ToolExecutionView ||--o{ ToolRegistry : uses
+MachineViewSet ||--o{ InspectionMachineSerializer : uses
+InspectionViewSet ||--o{ DistributedInspectionSerializer : uses
+MachineOrchestratorView ||--o{ MachineManager : uses
+MachineOrchestratorView ||--o{ TaskDistributor : uses
+WebhookReceiverView ||--o{ SecurityManager : uses
 
-' Tool Engine Relationships
-ToolRegistry ||--o{ ToolBase : manages
-ToolExecutor ||--o{ ToolBase : executes
-ToolExecutor ||--o{ ImageProcessor : uses
+' Orchestration Relationships
+MachineManager ||--o{ InspectionMachine : manages
+TaskDistributor ||--o{ DistributedInspection : distributes
+SecurityManager ||--o{ InspectionMachine : authenticates
 
-' Cross-layer Relationships
-ToolsStore ||--o{ ToolViewSet : communicates
-InspectionsStore ||--o{ InspectionViewSet : communicates
-ToolProperties ||--o{ ToolBase : configures
+' Flask Machine Relationships
+FlaskApp ||--o{ MachineAPI : provides
+MachineAPI ||--o{ WebhookHandler : uses
+FlaskApp ||--o{ AuthenticationMiddleware : uses
+AuthenticationMiddleware ||--o{ SecurityConfig : validates
+InspectionExecutor ||--o{ ToolRegistry : uses
+InspectionExecutor ||--o{ ImageProcessor : uses
+FlaskApp ||--o{ HeartbeatService : runs
+HeartbeatService ||--o{ DjangoCommunicator : uses
+
+' Cross-system Relationships
+MachineViewSet ||--o{ MachineAPI : communicates
+InspectionViewSet ||--o{ MachineAPI : communicates
+WebhookReceiverView ||--o{ WebhookHandler : receives
+TaskDistributor ||--o{ InspectionExecutor : distributes
 
 ' ========================================
 ' NOTES
 ' ========================================
-note top of ToolBase : "Classe abstrata base para todas as tools de visão computacional"
-note top of ToolRegistry : "Sistema centralizado para gerenciar tools disponíveis"
-note top of Validation : "Sistema de validação JavaScript puro (substitui Zod)"
-note top of ToolsCanvas : "Canvas visual para construção de pipelines de inspeção"
+note top of InspectionMachine : "Representa uma máquina de visão na rede com autenticação e monitoramento"
+note top of MachineManager : "Gerencia o ciclo de vida das máquinas de inspeção"
+note top of TaskDistributor : "Distribui inspeções para máquinas disponíveis baseado em capacidade e carga"
+note top of SecurityManager : "Gerencia autenticação mútua entre Django e máquinas Flask"
+note top of AuthenticationMiddleware : "Valida IP whitelist e tokens de autenticação"
+note top of HeartbeatService : "Serviço que mantém comunicação periódica com o orquestrador Django"
 
 @enduml

@@ -9,10 +9,12 @@ skinparam componentBackgroundColor #E3F2FD
 skinparam interfaceBackgroundColor #FFF3E0
 skinparam databaseBackgroundColor #E8F5E8
 
-title "AnalyticLens - Arquitetura de Componentes"
+title "AnalyticLens - Arquitetura de Componentes Distribuída"
 
 package "Frontend (Vue.js 3)" {
   component "App.vue" as App
+  component "DashboardView.vue" as DashboardView
+  component "MachineManagementView.vue" as MachineManagementView
   component "InspectionEditView.vue" as InspectionEditView
   component "ToolsCanvas.vue" as ToolsCanvas
   component "ToolProperties.vue" as ToolProperties
@@ -27,6 +29,7 @@ package "Frontend (Vue.js 3)" {
 
 package "Stores (Pinia)" {
   component "AuthStore" as AuthStore
+  component "MachinesStore" as MachinesStore
   component "ToolsStore" as ToolsStore
   component "InspectionsStore" as InspectionsStore
   component "CounterStore" as CounterStore
@@ -36,9 +39,10 @@ package "Utils & Services" {
   component "Validation" as Validation
   component "HttpClient" as HttpClient
   component "Router" as Router
+  component "WebSocket" as WebSocket
 }
 
-package "Backend (Django)" {
+package "Backend Django (Orquestrador)" {
   component "Django Server" as DjangoServer
   component "URLs" as URLs
   component "Middleware" as Middleware
@@ -46,29 +50,49 @@ package "Backend (Django)" {
 }
 
 package "API (Django REST Framework)" {
-  component "ToolViewSet" as ToolViewSet
+  component "MachineViewSet" as MachineViewSet
   component "InspectionViewSet" as InspectionViewSet
-  component "ToolExecutionView" as ToolExecutionView
+  component "MachineOrchestratorView" as MachineOrchestratorView
+  component "WebhookReceiverView" as WebhookReceiverView
   component "AuthView" as AuthView
   component "Serializers" as Serializers
 }
 
 package "Models (Django ORM)" {
   component "User Model" as UserModel
+  component "InspectionMachine Model" as InspectionMachineModel
+  component "MachineHeartbeat Model" as MachineHeartbeatModel
+  component "DistributedInspection Model" as DistributedInspectionModel
+  component "InspectionQueue Model" as InspectionQueueModel
   component "ToolBase Model" as ToolBaseModel
   component "BlobDetectionTool Model" as BlobDetectionToolModel
-  component "Inspection Model" as InspectionModel
   component "InspectionResult Model" as InspectionResultModel
-  component "ToolExecution Model" as ToolExecutionModel
 }
 
-package "Computer Vision Engine" {
-  component "ToolRegistry" as ToolRegistry
-  component "ToolExecutor" as ToolExecutor
-  component "ImageProcessor" as ImageProcessor
+package "Orchestration Engine" {
+  component "MachineManager" as MachineManager
+  component "TaskDistributor" as TaskDistributor
+  component "SecurityManager" as SecurityManager
+  component "QueueManager" as QueueManager
+}
+
+package "Máquinas de Visão (Flask)" {
+  component "Flask App" as FlaskApp
+  component "Machine API" as MachineAPI
+  component "Authentication Middleware" as AuthMiddleware
+  component "Security Config" as SecurityConfig
+  component "Inspection Executor" as InspectionExecutor
+  component "Tool Registry" as ToolRegistry
+  component "Image Processor" as ImageProcessor
+  component "Django Communicator" as DjangoCommunicator
+  component "Heartbeat Service" as HeartbeatService
+}
+
+package "Computer Vision Tools" {
   component "BlobDetectionTool" as BlobDetectionTool
   component "EdgeDetectionTool" as EdgeDetectionTool
   component "ColorFilterTool" as ColorFilterTool
+  component "ImageSourceTool" as ImageSourceTool
 }
 
 package "Database" {
@@ -79,6 +103,8 @@ package "External Dependencies" {
   component "OpenCV (cv2)" as OpenCV
   component "NumPy" as NumPy
   component "Pillow (PIL)" as Pillow
+  component "Flask" as Flask
+  component "Requests" as Requests
 }
 
 ' ========================================
@@ -86,12 +112,16 @@ package "External Dependencies" {
 ' ========================================
 
 interface "HTTP REST API" as HTTPInterface
+interface "Webhook Interface" as WebhookInterface
+interface "WebSocket Interface" as WebSocketInterface
 interface "File Upload" as FileUploadInterface
 interface "Database Connection" as DBInterface
 
 ' Frontend Communications
 App --> AuthStore : uses
 App --> Router : uses
+DashboardView --> MachinesStore : uses
+MachineManagementView --> MachinesStore : uses
 InspectionEditView --> ToolsCanvas : contains
 InspectionEditView --> ToolProperties : contains
 ToolsCanvas --> ToolNode : contains
@@ -100,46 +130,76 @@ InspectionEditView --> InspectionsStore : uses
 
 ' Store Communications
 AuthStore --> HttpClient : uses
+MachinesStore --> HttpClient : uses
 ToolsStore --> HttpClient : uses
 InspectionsStore --> HttpClient : uses
 
 ' Backend Communications
 DjangoServer --> URLs : uses
-URLs --> ToolViewSet : routes
+URLs --> MachineViewSet : routes
 URLs --> InspectionViewSet : routes
-URLs --> ToolExecutionView : routes
+URLs --> MachineOrchestratorView : routes
+URLs --> WebhookReceiverView : routes
 URLs --> AuthView : routes
 
 ' API Communications
-ToolViewSet --> Serializers : uses
+MachineViewSet --> Serializers : uses
 InspectionViewSet --> Serializers : uses
-ToolExecutionView --> ToolRegistry : uses
+MachineOrchestratorView --> MachineManager : uses
+MachineOrchestratorView --> TaskDistributor : uses
+WebhookReceiverView --> SecurityManager : uses
 
 ' Model Communications
-ToolViewSet --> UserModel : queries
-InspectionViewSet --> InspectionModel : queries
-ToolExecutionView --> InspectionResultModel : queries
+MachineViewSet --> InspectionMachineModel : queries
+InspectionViewSet --> DistributedInspectionModel : queries
+MachineOrchestratorView --> InspectionQueueModel : queries
+WebhookReceiverView --> MachineHeartbeatModel : creates
 
-' CV Engine Communications
+' Orchestration Communications
+MachineManager --> InspectionMachineModel : manages
+TaskDistributor --> DistributedInspectionModel : distributes
+SecurityManager --> InspectionMachineModel : authenticates
+QueueManager --> InspectionQueueModel : manages
+
+' Flask Machine Communications
+FlaskApp --> MachineAPI : provides
+FlaskApp --> AuthMiddleware : uses
+FlaskApp --> SecurityConfig : configures
+FlaskApp --> InspectionExecutor : runs
+FlaskApp --> HeartbeatService : starts
+MachineAPI --> DjangoCommunicator : uses
+HeartbeatService --> DjangoCommunicator : uses
+
+' CV Tools Communications
+InspectionExecutor --> ToolRegistry : uses
 ToolRegistry --> BlobDetectionTool : manages
 ToolRegistry --> EdgeDetectionTool : manages
 ToolRegistry --> ColorFilterTool : manages
-ToolExecutor --> ImageProcessor : uses
+ToolRegistry --> ImageSourceTool : manages
+InspectionExecutor --> ImageProcessor : uses
 
 ' Database Communications
 UserModel --> PostgreSQL : stores
+InspectionMachineModel --> PostgreSQL : stores
+MachineHeartbeatModel --> PostgreSQL : stores
+DistributedInspectionModel --> PostgreSQL : stores
+InspectionQueueModel --> PostgreSQL : stores
 ToolBaseModel --> PostgreSQL : stores
-InspectionModel --> PostgreSQL : stores
 InspectionResultModel --> PostgreSQL : stores
-ToolExecutionModel --> PostgreSQL : stores
 
 ' External Dependencies
 ImageProcessor --> OpenCV : uses
 ImageProcessor --> NumPy : uses
 ImageProcessor --> Pillow : uses
+FlaskApp --> Flask : uses
+DjangoCommunicator --> Requests : uses
 
-' Cross-layer Communications
+' Cross-system Communications
 HttpClient --> HTTPInterface : communicates
+MachineAPI --> HTTPInterface : provides
+WebhookReceiverView --> WebhookInterface : receives
+DjangoCommunicator --> WebhookInterface : sends
+WebSocket --> WebSocketInterface : provides
 ToolsCanvas --> FileUploadInterface : uses
 DjangoServer --> DBInterface : connects
 
@@ -147,8 +207,11 @@ DjangoServer --> DBInterface : connects
 ' NOTES
 ' ========================================
 note top of Validation : "Sistema de validação\nJavaScript puro\n(substitui Zod)"
-note top of ToolRegistry : "Sistema centralizado\npara gerenciar tools"
-note top of PostgreSQL : "Banco principal\ncom todas as entidades"
+note top of MachineManager : "Gerencia ciclo de vida\ndas máquinas de inspeção"
+note top of TaskDistributor : "Distribui inspeções\ninteligentemente"
+note top of SecurityManager : "Autenticação mútua\nIP Whitelist + Tokens"
+note top of FlaskApp : "Serviço independente\nem cada máquina de visão"
+note top of PostgreSQL : "Banco centralizado\ncom todas as entidades"
 note top of OpenCV : "Biblioteca principal\npara visão computacional"
 
 @enduml

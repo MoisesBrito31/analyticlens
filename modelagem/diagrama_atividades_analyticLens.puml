@@ -10,84 +10,124 @@ skinparam activityEndColor #F44336
 skinparam activityColor #2196F3
 skinparam activityDiamondColor #FF9800
 
-title "AnalyticLens - Workflow do Pipeline de Inspeção"
+title "AnalyticLens - Workflow de Inspeção Distribuída"
 
 start
 
 :Usuário acessa aplicação;
 
 if (Usuário autenticado?) then (sim)
-  :Carrega tools disponíveis;
-  :Exibe interface de criação;
+  :Carrega máquinas disponíveis;
+  :Exibe dashboard de máquinas;
   
-  :Usuário cria nova inspeção;
-  
-  fork
-    :Seleciona tool Image Source;
-    :Configura parâmetros;
-    if (Tipo de fonte?) then (URL)
-      :Insere URL da imagem;
-      :Valida URL;
-    else (Upload)
-      :Seleciona arquivo;
-      :Valida formato;
-      :Processa arquivo;
-    endif
-    :Adiciona ao canvas;
-  fork again
-    :Seleciona tools de processamento;
-    :Configura parâmetros;
-    :Adiciona ao canvas;
-  end fork
-  
-  :Conecta tools no pipeline;
-  
-  if (Pipeline válido?) then (sim)
-    :Salva inspeção;
+  if (Máquinas cadastradas?) then (sim)
+    :Exibe status das máquinas;
+    :Mostra capacidades disponíveis;
     
-    if (Executar agora?) then (sim)
-      :Inicia execução;
+    :Usuário cria nova inspeção;
+    
+    fork
+      :Seleciona tool Image Source;
+      :Configura parâmetros;
+      if (Tipo de fonte?) then (URL)
+        :Insere URL da imagem;
+        :Valida URL;
+      else (Upload)
+        :Seleciona arquivo;
+        :Valida formato;
+        :Processa arquivo;
+      endif
+      :Adiciona ao canvas;
+    fork again
+      :Seleciona tools de processamento;
+      :Configura parâmetros;
+      :Adiciona ao canvas;
+    end fork
+    
+    :Conecta tools no pipeline;
+    
+    if (Pipeline válido?) then (sim)
+      :Salva inspeção no Django;
       
-      :Carrega imagem fonte;
-      
-      while (Tool na sequência?) is (sim)
-        :Executa tool atual;
-        :Valida parâmetros;
+      if (Executar agora?) then (sim)
+        :Seleciona máquina de destino;
         
-        if (Tool é Image Source?) then (sim)
-          :Carrega imagem;
-          :Prepara dados;
-        else (Tool de processamento)
-          :Aplica algoritmo;
-          :Processa imagem;
-          :Gera resultados;
+        if (Máquina disponível?) then (sim)
+          :Django distribui inspeção;
+          :Envia para máquina Flask;
+          
+          :Máquina Flask valida autenticação;
+          if (IP + Token válidos?) then (sim)
+            :Máquina recebe inspeção;
+            :Carrega pipeline_config;
+            :Inicia processamento;
+            
+            :Carrega imagem fonte;
+            
+            while (Tool na sequência?) is (sim)
+              :Executa tool atual;
+              :Valida parâmetros;
+              
+              if (Tool é Image Source?) then (sim)
+                :Carrega imagem;
+                :Prepara dados;
+              else (Tool de processamento)
+                :Aplica algoritmo;
+                :Processa imagem;
+                :Gera resultados;
+              endif
+              
+              :Salva resultado intermediário;
+              :Prepara dados para próxima tool;
+            endwhile (não)
+            
+            :Finaliza processamento;
+            :Organiza resultados;
+            :Envia para Django via webhook;
+            
+            :Django recebe resultados;
+            :Atualiza status da inspeção;
+            :Salva InspectionResult;
+            :Notifica frontend via WebSocket;
+            
+            fork
+              :Frontend exibe imagem processada;
+            fork again
+              :Frontend exibe métricas;
+            fork again
+              :Frontend exibe áreas detectadas;
+            fork again
+              :Frontend exibe tempo de processamento;
+            end fork
+            
+          else (não)
+            :Máquina rejeita inspeção;
+            :Django marca como falha;
+            :Notifica usuário do erro;
+          endif
+          
+        else (não)
+          :Inspeção vai para fila;
+          :Aguarda máquina disponível;
+          :Notifica usuário;
         endif
         
-        :Salva resultado intermediário;
-        :Prepara dados para próxima tool;
-      endwhile (não)
-      
-      :Finaliza execução;
-      :Gera relatório;
-      
-      fork
-        :Exibe imagem processada;
-      fork again
-        :Exibe métricas;
-      fork again
-        :Exibe áreas detectadas;
-      end fork
-      
-      :Salva resultado final;
+      else (não)
+        :Inspeção salva como rascunho;
+      endif
       
     else (não)
-      :Inspeção salva como rascunho;
+      :Exibe erros de validação;
+      :Solicita correções;
+      :Retorna à configuração;
     endif
     
   else (não)
-    :Exibe erros de validação;
-    :Solicita correções;
-    :Retorna à configuração;
+    :Solicita cadastro de máquina;
+    :Usuário cadastra máquina;
+    :Configura IP Whitelist;
+    :Gera token público;
+    :Retorna ao início;
   endif
   
 else (não)
@@ -112,17 +152,24 @@ note right
 end note
 
 note right
-  Arquitetura modular:
-  - ToolRegistry gerencia tools
-  - ToolExecutor executa
-  - ImageProcessor processa
+  Arquitetura distribuída:
+  - Django orquestra tarefas
+  - Máquinas Flask processam
+  - Webhooks para comunicação
 end note
 
 note right
-  Persistência:
-  - InspectionResult
-  - ToolExecution logs
-  - Dados processados
+  Segurança:
+  - IP Whitelist
+  - Tokens de autenticação
+  - Validação mútua
+end note
+
+note right
+  Monitoramento:
+  - Heartbeat das máquinas
+  - Status em tempo real
+  - Dashboard centralizado
 end note
 
 @enduml

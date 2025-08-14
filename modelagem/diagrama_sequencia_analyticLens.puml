@@ -7,96 +7,117 @@ skinparam maxMessageSize 150
 skinparam sequenceArrowThickness 2
 skinparam roundcorner 20
 
-title "AnalyticLens - Fluxo de Execução de Inspeção"
+title "AnalyticLens - Fluxo de Execução de Inspeção Distribuída"
 
 actor "Usuário" as User
 participant "Frontend\n(Vue.js)" as Frontend
-participant "AuthStore\n(Pinia)" as AuthStore
-participant "ToolsStore\n(Pinia)" as ToolsStore
+participant "MachinesStore\n(Pinia)" as MachinesStore
 participant "InspectionsStore\n(Pinia)" as InspectionsStore
-participant "Django API" as API
-participant "ToolRegistry" as Registry
-participant "ToolExecutor" as Executor
+participant "Django API\n(Orquestrador)" as DjangoAPI
+participant "MachineManager" as MachineManager
+participant "TaskDistributor" as TaskDistributor
+participant "Máquina de Visão\n(Flask)" as MVFlask
+participant "InspectionExecutor" as Executor
 participant "ImageProcessor" as Processor
 database "Database\n(PostgreSQL)" as DB
 
-== Autenticação ==
+== Autenticação e Carregamento ==
 User -> Frontend: Acessa aplicação
-Frontend -> AuthStore: Verifica autenticação
-AuthStore -> API: GET /api/auth/me
-API -> DB: Query user
-DB --> API: User data
-API --> AuthStore: User info
-AuthStore --> Frontend: isAuthenticated = true
+Frontend -> DjangoAPI: GET /api/auth/me
+DjangoAPI -> DB: Query user
+DB --> DjangoAPI: User data
+DjangoAPI --> Frontend: User info
 
-== Carregamento de Tools ==
-Frontend -> ToolsStore: Carrega tools disponíveis
-ToolsStore -> API: GET /api/tools
-API -> Registry: Lista tools
-Registry --> API: Tools disponíveis
-API --> ToolsStore: Lista de tools
-ToolsStore --> Frontend: Tools carregadas
+== Carregamento de Máquinas Disponíveis ==
+Frontend -> MachinesStore: Carrega máquinas disponíveis
+MachinesStore -> DjangoAPI: GET /api/machines/
+DjangoAPI -> MachineManager: Lista máquinas online
+MachineManager -> DB: Query InspectionMachine
+DB --> MachineManager: Máquinas disponíveis
+MachineManager --> DjangoAPI: Lista de máquinas
+DjangoAPI --> MachinesStore: Máquinas carregadas
+MachinesStore --> Frontend: Máquinas disponíveis
 
 == Criação de Inspeção ==
 User -> Frontend: Cria nova inspeção
 Frontend -> Frontend: Abre InspectionEditView
-Frontend -> ToolsStore: Seleciona tool (ex: image_source)
-ToolsStore --> Frontend: Tool selecionada
-
-== Configuração da Tool ==
-User -> Frontend: Configura parâmetros
+Frontend -> Frontend: Configura pipeline de tools
+Frontend -> Frontend: Seleciona máquina de destino
 Frontend -> Frontend: Valida parâmetros (JavaScript)
-Frontend -> Frontend: Adiciona tool ao canvas
-Frontend -> Frontend: Atualiza pipeline_config
-
-== Upload de Imagem ==
-User -> Frontend: Seleciona arquivo de imagem
-Frontend -> Frontend: FileReader.readAsDataURL()
-Frontend -> Frontend: URL.createObjectURL()
-Frontend -> Frontend: Exibe preview da imagem
-
-== Adição de Tool de Processamento ==
-User -> Frontend: Adiciona tool (ex: blob_detection)
-Frontend -> Frontend: Conecta tools no pipeline
-Frontend -> Frontend: Configura parâmetros da tool
 
 == Salvamento do Pipeline ==
 User -> Frontend: Clica "Salvar Pipeline"
 Frontend -> InspectionsStore: Salva inspeção
-InspectionsStore -> API: POST /api/inspections/
-API -> DB: Cria Inspection record
-DB --> API: Inspection criada
-API --> InspectionsStore: Confirmação
+InspectionsStore -> DjangoAPI: POST /api/inspections/
+DjangoAPI -> DB: Cria DistributedInspection record
+DB --> DjangoAPI: Inspeção criada
+DjangoAPI --> InspectionsStore: Confirmação
 InspectionsStore --> Frontend: Pipeline salvo
 
-== Execução do Pipeline ==
-User -> Frontend: Clica "Executar Pipeline"
-Frontend -> API: POST /api/tools/{tool_name}/run/
-API -> Executor: Executa tool
+== Envio para Máquina de Visão ==
+User -> Frontend: Clica "Enviar para Máquina"
+Frontend -> DjangoAPI: POST /api/inspections/{id}/send/
+DjangoAPI -> TaskDistributor: Distribui inspeção
+TaskDistributor -> MachineManager: Seleciona melhor máquina
+MachineManager -> DB: Verifica disponibilidade
+DB --> MachineManager: Máquina disponível
+TaskDistributor -> MVFlask: POST /receive_inspection
+note right: Envia pipeline_config + imagem
+
+== Processamento na Máquina de Visão ==
+MVFlask -> MVFlask: Valida autenticação (IP + Token)
+MVFlask -> Executor: Executa inspeção
+Executor -> Executor: Carrega pipeline_config
 Executor -> Processor: Processa imagem
-Processor -> Processor: Aplica algoritmo (ex: blob detection)
+Processor -> Processor: Executa tools do pipeline
 Processor --> Executor: Resultado processado
-Executor --> API: Resultado da execução
-API -> DB: Salva InspectionResult
-DB --> API: Result salvo
-API --> Frontend: Resultado da execução
+Executor --> MVFlask: Resultado da execução
+
+== Retorno dos Resultados ==
+MVFlask -> DjangoAPI: POST /api/webhooks/results/
+note right: Webhook com resultados + métricas
+DjangoAPI -> DB: Salva InspectionResult
+DB --> DjangoAPI: Result salvo
+DjangoAPI -> DB: Atualiza status da inspeção
+DB --> DjangoAPI: Status atualizado
+
+== Atualização da Interface ==
+DjangoAPI --> Frontend: WebSocket: Resultado disponível
+Frontend -> InspectionsStore: Atualiza estado
+InspectionsStore -> DjangoAPI: GET /api/inspections/{id}/
+DjangoAPI -> DB: Query inspeção atualizada
+DB --> DjangoAPI: Dados atualizados
+DjangoAPI --> InspectionsStore: Inspeção atualizada
+InspectionsStore --> Frontend: Resultado exibido
 
 == Visualização dos Resultados ==
 Frontend -> Frontend: Exibe imagem processada
 Frontend -> Frontend: Mostra métricas e dados
 Frontend -> Frontend: Exibe áreas detectadas (bounding boxes)
+Frontend -> Frontend: Mostra tempo de processamento
+
+== Monitoramento em Tempo Real ==
+loop A cada 30 segundos
+    MVFlask -> DjangoAPI: POST /api/webhooks/heartbeat/
+    DjangoAPI -> DB: Atualiza MachineHeartbeat
+    DjangoAPI -> DB: Atualiza status da máquina
+    DjangoAPI --> Frontend: WebSocket: Status atualizado
+    Frontend -> Frontend: Atualiza dashboard
+end
 
 == Histórico e Relatórios ==
 User -> Frontend: Acessa histórico
 Frontend -> InspectionsStore: Carrega inspeções
-InspectionsStore -> API: GET /api/inspections/
-API -> DB: Query inspections
-DB --> API: Lista de inspeções
-API --> InspectionsStore: Dados das inspeções
+InspectionsStore -> DjangoAPI: GET /api/inspections/
+DjangoAPI -> DB: Query DistributedInspection
+DB --> DjangoAPI: Lista de inspeções
+DjangoAPI --> InspectionsStore: Dados das inspeções
 InspectionsStore --> Frontend: Histórico carregado
 
-note over Frontend, API : "Validação JavaScript puro\n(substitui Zod)"
-note over Registry, Processor : "Arquitetura modular\nde tools de CV"
-note over API, DB : "Django ORM + PostgreSQL"
+note over Frontend, DjangoAPI : "Validação JavaScript puro\n(substitui Zod)"
+note over MachineManager, TaskDistributor : "Orquestração inteligente\nde tarefas distribuídas"
+note over MVFlask, Executor : "Arquitetura modular\nde tools de CV"
+note over DjangoAPI, DB : "Django ORM + PostgreSQL"
+note over MVFlask, DjangoAPI : "Comunicação via\nWebhooks + API REST"
 
 @enduml
