@@ -1,0 +1,24 @@
+# Requisitos para AnalyticLens Vision Machine (VM)
+# Servidor Flask para máquina de visão computacional
+
+# Framework web
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-SocketIO==5.3.6
+
+# Visão computacional
+opencv-python==4.8.1.78
+opencv-python-headless==4.12.0.88
+numpy==1.24.3
+Pillow==10.0.1
+
+# Processamento assíncrono e WebSocket
+python-socketio==5.10.0
+eventlet==0.33.3
+
+# Utilitários
+python-decouple==3.8
+requests==2.31.0
+
+# Logging e debugging
+colorlog==6.7.0

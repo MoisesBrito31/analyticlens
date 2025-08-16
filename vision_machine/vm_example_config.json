@@ -1,0 +1,21 @@
+{
+  "machine_id": "vm_001",
+  "django_url": "http://localhost:8000",
+  "status": "idle",
+  "mode": "TESTE",
+  "connection_status": "disconnected",
+  "inspection_config": {},
+  "source_config": {
+    "type": "pasta",
+    "camera_id": 0,
+    "resolution": [640, 480],
+    "fps": 30,
+    "folder_path": "./images",
+    "rtsp_url": ""
+  },
+  "trigger_config": {
+    "type": "continuous",
+    "interval_ms": 2000
+  },
+  "last_saved": "2023-12-21T10:30:45.123456"
+}
