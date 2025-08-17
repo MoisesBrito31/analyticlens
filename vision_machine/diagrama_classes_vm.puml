@@ -1,275 +1,205 @@
 @startuml diagrama_classes_vm
 !theme plain
 skinparam classAttributeIconSize 0
-skinparam classFontSize 10
-skinparam classFontStyle bold
-skinparam classBackgroundColor #E8F4FD
-skinparam classBorderColor #2E86AB
-skinparam classArrowColor #2E86AB
+skinparam classFontSize 12
+skinparam classFontName Arial
 
-title Diagrama de Classes - Vision Machine (vm.py) - Estado Atual
-
-' ========================================
-' CLASSE PRINCIPAL: VisionMachine
-' ========================================
+' Classes principais
 class VisionMachine {
-    -- Atributos de Identificação --
-    + machine_id: str
-    + django_url: str
-    + config_file: str
-    
-    -- Estado da VM --
-    + status: str
-    + mode: str
-    + connection_status: str
-    + error_msg: str
-    
-    -- Configurações --
-    + source_config: Dict[str, Any]
-    + trigger_config: Dict[str, Any]
-    + inspection_config: Dict[str, Any]
-    
-    -- Componentes --
-    + image_source: ImageSource
-    
-    -- Métodos de Configuração --
-    + _load_config(): void
-    + _set_default_config(): void
-    + save_config(): void
-    + _check_auto_start_inspection(): void
-    
-    -- Métodos de Controle --
-    + change_mode(new_mode: str): bool
-    + set_error(error_message: str): void
-    + clear_error(): bool
-    
-    -- Métodos de Atualização --
-    + update_source_config(new_config: Dict): void
-    + update_trigger_config(new_config: Dict): void
-    + update_inspection_config(new_config: Dict): void
+  - mode: str
+  - source_config: Dict
+  - trigger_config: Dict
+  - inspection_config: Dict
+  - inspection_processor: InspectionProcessor
+  - error_message: str
+  - error_timestamp: datetime
+  + __init__(config_file: str)
+  + start()
+  + stop()
+  + update_source_config(config: Dict)
+  + update_trigger_config(config: Dict)
+  + update_inspection_config(config: Dict)
+  + set_error(message: str)
+  + clear_error()
+  + save_config()
+  + load_config()
 }
 
-' ========================================
-' CLASSE: ImageSource
-' ========================================
-class ImageSource {
-    -- Atributos de Configuração --
-    + source_config: Dict[str, Any]
-    + source_type: str
-    + capture: cv2.VideoCapture
-    + image_files: List[str]
-    + current_image_index: int
-    
-    -- Métodos de Inicialização --
-    + _initialize_source(): void
-    + _initialize_folder_source(): void
-    + _initialize_camera_source(): void
-    + _initialize_rtsp_source(): void
-    
-    -- Métodos de Captura --
-    + get_frame(): np.ndarray
-    + _get_folder_frame(): np.ndarray
-    + _get_camera_frame(): np.ndarray
-    
-    -- Métodos de Gerenciamento --
-    + release(): void
-    + update_config(new_config: Dict): void
-}
-
-' ========================================
-' CLASSE: TestModeProcessor
-' ========================================
-class TestModeProcessor {
-    -- Atributos de Controle --
-    + vm: VisionMachine
-    + socketio: SocketIO
-    + running: bool
-    + processing_thread: Thread
-    + frame_count: int
-    + approved_count: int
-    + rejected_count: int
-    + last_websocket_update: float
-    + websocket_update_interval: float
-    
-    -- Métodos de Controle --
-    + start(): void
-    + stop(): void
-    
-    -- Métodos de Processamento --
-    + _processing_loop(): void
-    + _process_frame(frame: np.ndarray): Dict[str, Any]
-    + _send_websocket_update(result: Dict): void
-}
-
-' ========================================
-' CLASSE: FlaskVisionServer
-' ========================================
 class FlaskVisionServer {
-    -- Atributos do Servidor --
-    + app: Flask
-    + socketio: SocketIO
-    + vm: VisionMachine
-    + test_processor: TestModeProcessor
-    
-    -- Métodos de Inicialização --
-    + __init__(machine_id: str, django_url: str, config_file: str): void
-    + _setup_shutdown_handlers(): void
-    + _check_auto_start_inspection(): void
-    + _cleanup(): void
-    
-    -- Métodos de Configuração --
-    + _setup_routes(): void
-    + _setup_socketio_events(): void
-    
-    -- Métodos de Execução --
-    + run(host: str, port: int, debug: bool): void
+  - app: Flask
+  - socketio: SocketIO
+  - vm: VisionMachine
+  + __init__(vm: VisionMachine)
+  + start()
+  + stop()
+  - _setup_routes()
+  - _setup_socketio()
 }
 
-' ========================================
-' CLASSE: Signal (Sistema)
-' ========================================
-class Signal {
-    <<external>>
-    + SIGINT: int
-    + SIGTERM: int
+class TestModeProcessor {
+  - vm: VisionMachine
+  - running: bool
+  - frame_count: int
+  - approved_count: int
+  - rejected_count: int
+  - trigger_lock: threading.Lock
+  - trigger_requested: bool
+  + __init__(vm: VisionMachine)
+  + start()
+  + stop()
+  + request_trigger()
+  - _process_loop()
+  - _process_frame(frame)
+  - _send_websocket_update(result)
+  - _send_inspection_result(result)
 }
 
-' ========================================
-' CLASSE: Atexit (Sistema)
-' ========================================
-class Atexit {
-    <<external>>
-    + register(func): void
+' Sistema de Ferramentas
+class InspectionProcessor {
+  - config: Dict
+  - tools: List[BaseTool]
+  - results: Dict[int, Dict]
+  + __init__(config: Dict)
+  + process_inspection(image: np.ndarray)
+  + get_tool_by_id(tool_id: int)
+  + get_tools_by_type(tool_type: str)
+  + validate_all_tools()
+  - _initialize_tools()
+  - _create_tool(tool_config: Dict)
+  - _apply_roi_result(original_image, roi_result, roi)
+  - _generate_final_result()
 }
 
-' ========================================
-' CLASSE: Threading (Sistema)
-' ========================================
-class Threading {
-    <<external>>
-    + Thread: class
+abstract class BaseTool {
+  # id: int
+  # name: str
+  # type: str
+  # roi: Dict
+  # inspec_pass_fail: bool
+  # reference_tool_id: int
+  # config: Dict
+  + __init__(config: Dict)
+  + process(image: np.ndarray, roi_image: np.ndarray, previous_results: Dict)
+  + extract_roi(image: np.ndarray)
+  + get_reference_result(previous_results: Dict)
+  + is_filter_tool(): bool
+  + is_analysis_tool(): bool
+  + is_math_tool(): bool
+  + validate_config(): bool
 }
 
-' ========================================
-' CLASSE: Flask (Framework)
-' ========================================
-class Flask {
-    <<external>>
-    + __init__(name: str): void
-    + route(path: str): decorator
-    + run(host: str, port: int): void
+class GrayscaleTool {
+  - method: str
+  - normalize: bool
+  + process(image: np.ndarray, roi_image: np.ndarray, previous_results: Dict)
+  + validate_config(): bool
 }
 
-' ========================================
-' CLASSE: SocketIO (Framework)
-' ========================================
-class SocketIO {
-    <<external>>
-    + __init__(app, **kwargs): void
-    + on(event: str): decorator
-    + emit(event: str, data: Any): void
-    + run(app, **kwargs): void
+class BlobTool {
+  - th_min: int
+  - th_max: int
+  - area_min: float
+  - area_max: float
+  - test_total_area_min: float
+  - test_total_area_max: float
+  - test_blob_count_min: int
+  - test_blob_count_max: int
+  - total_area_test: bool
+  - blob_count_test: bool
+  + process(image: np.ndarray, roi_image: np.ndarray, previous_results: Dict)
+  + validate_config(): bool
+  - _run_internal_tests(blobs: List, total_area: float)
+  - _calculate_centroid(contour)
 }
 
-' ========================================
-' CLASSE: OpenCV (cv2)
-' ========================================
-class OpenCV {
-    <<external>>
-    + VideoCapture: class
-    + imread(path: str): np.ndarray
+class MathTool {
+  - operation: str
+  - reference_tool_id: int
+  - custom_formula: str
+  + process(image: np.ndarray, roi_image: np.ndarray, previous_results: Dict)
+  + validate_config(): bool
+  - _execute_operation(operation: str, value1: float, value2: float)
+  - _evaluate_custom_formula(formula: str, values: Dict)
 }
 
-' ========================================
-' CLASSE: NumPy (np)
-' ========================================
-class NumPy {
-    <<external>>
-    + ndarray: class
-    + random: module
+' Classes de fonte de imagem
+class ImageSource {
+  - source_type: str
+  - config: Dict
+  + __init__(config: Dict)
+  + get_frame()
+  + is_available()
+  + close()
 }
 
-' ========================================
-' RELACIONAMENTOS
-' ========================================
+class FolderImageSource {
+  - folder_path: str
+  - image_files: List[str]
+  - current_index: int
+  + __init__(config: Dict)
+  + get_frame()
+  + is_available()
+}
 
-' VisionMachine contém ImageSource
-VisionMachine *-- ImageSource : contém
+class LocalCameraSource {
+  - camera_index: int
+  - cap: cv2.VideoCapture
+  + __init__(config: Dict)
+  + get_frame()
+  + is_available()
+  + close()
+}
 
-' FlaskVisionServer contém VisionMachine
-FlaskVisionServer *-- VisionMachine : contém
+class IPCameraSource {
+  - url: str
+  - cap: cv2.VideoCapture
+  + __init__(config: Dict)
+  + get_frame()
+  + is_available()
+  + close()
+}
 
-' FlaskVisionServer contém TestModeProcessor
-FlaskVisionServer *-- TestModeProcessor : contém
+' Relacionamentos
+VisionMachine --> InspectionProcessor : uses
+VisionMachine --> ImageSource : uses
+VisionMachine --> TestModeProcessor : uses
 
-' TestModeProcessor usa VisionMachine
-TestModeProcessor --> VisionMachine : usa
+TestModeProcessor --> VisionMachine : processes for
+TestModeProcessor --> InspectionProcessor : uses
 
-' TestModeProcessor usa SocketIO
-TestModeProcessor --> SocketIO : usa
+InspectionProcessor --> BaseTool : manages
+BaseTool <|-- GrayscaleTool : extends
+BaseTool <|-- BlobTool : extends
+BaseTool <|-- MathTool : extends
 
-' FlaskVisionServer usa Flask
-FlaskVisionServer *-- Flask : usa
+FlaskVisionServer --> VisionMachine : serves
+FlaskVisionServer --> TestModeProcessor : communicates with
 
-' FlaskVisionServer usa SocketIO
-FlaskVisionServer *-- SocketIO : usa
+ImageSource <|-- FolderImageSource : extends
+ImageSource <|-- LocalCameraSource : extends
+ImageSource <|-- IPCameraSource : extends
 
-' ImageSource usa OpenCV
-ImageSource --> OpenCV : usa
-
-' ImageSource usa NumPy
-ImageSource --> NumPy : usa
-
-' TestModeProcessor usa Threading
-TestModeProcessor --> Threading : usa
-
-' FlaskVisionServer usa Signal
-FlaskVisionServer --> Signal : usa
-
-' FlaskVisionServer usa Atexit
-FlaskVisionServer --> Atexit : usa
-
-' ========================================
-' NOTAS EXPLICATIVAS
-' ========================================
-note top of VisionMachine
-  Classe principal que gerencia:
-  - Estado da VM (idle, running, error)
-  - Configurações persistentes
-  - Source de imagem
-  - Auto-start de inspeção
+' Notas
+note right of InspectionProcessor
+  Sistema de ferramentas modular
+  - Execução sequencial
+  - Cache de imagens processadas
+  - Referências entre ferramentas
+  - Medição de tempo
 end note
 
-note top of ImageSource
-  Gerencia diferentes fontes:
-  - pasta: imagens de arquivo
-  - camera: câmera local
-  - camera_IP: stream RTSP
-  - Recriação automática em caso de erro
+note right of BaseTool
+  Classe abstrata para todas as ferramentas
+  - ROI extraction
+  - Tool type classification
+  - Configuration validation
 end note
 
-note top of TestModeProcessor
-  Processa modo teste:
-  - Loop de processamento em thread
-  - Simulação de inspeção
-  - WebSocket com rate limiting
-  - Tratamento de erros robusto
-end note
-
-note top of FlaskVisionServer
-  Servidor Flask principal:
-  - API REST completa
-  - WebSocket SocketIO
-  - Handlers de shutdown
-  - Auto-start de inspeção
-end note
-
-note bottom of VisionMachine
-  🔄 Persistência automática:
-  - Carrega de vm_config.json
-  - Salva em mudanças
-  - Recupera de erros
-  - Auto-start inteligente
+note right of TestModeProcessor
+  Processador principal de teste
+  - Modo contínuo e trigger
+  - WebSocket updates
+  - Contadores de aprovação/rejeição
 end note
 
 @enduml

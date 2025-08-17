@@ -26,6 +26,14 @@ from flask_socketio import SocketIO, emit, disconnect
 import cv2
 import numpy as np
 
+# Import do sistema de ferramentas
+try:
+    from inspection_processor import InspectionProcessor
+    TOOLS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"⚠️ Sistema de ferramentas não disponível: {str(e)}")
+    TOOLS_AVAILABLE = False
+
 # Configuração de logging
 logging.basicConfig(
     level=logging.INFO,
@@ -271,6 +279,10 @@ class TestModeProcessor:
         self.last_websocket_update = 0
         self.websocket_update_interval = 1.0  # 1 segundo
         
+        # Controle para modo gatilho
+        self.trigger_requested = False
+        self.trigger_lock = threading.Lock()
+        
     def start(self):
         """Inicia o processamento em modo teste"""
         if self.running:
@@ -300,6 +312,12 @@ class TestModeProcessor:
             logger.info(f"📊 Thread finalizada: {not self.processing_thread.is_alive()}")
         logger.info("✅ Processador de modo teste parado")
     
+    def request_trigger(self):
+        """Solicita execução de uma inspeção (modo gatilho)"""
+        with self.trigger_lock:
+            self.trigger_requested = True
+            logger.info("🔘 Trigger solicitado para próxima execução")
+    
     def _processing_loop(self):
         """Loop principal de processamento"""
         logger.info("🔄 Loop de processamento iniciado")
@@ -324,6 +342,19 @@ class TestModeProcessor:
                     self.running = False
                     break
                 
+                # Verificar tipo de trigger
+                trigger_type = self.vm.trigger_config.get('type', 'continuous')
+                
+                if trigger_type == 'trigger':
+                    # Modo gatilho: só processar se trigger foi solicitado
+                    with self.trigger_lock:
+                        if not self.trigger_requested:
+                            time.sleep(0.1)  # Aguardar trigger
+                            continue
+                        else:
+                            self.trigger_requested = False  # Consumir trigger
+                            logger.info("🔘 Trigger consumido, processando frame...")
+                
                 # Obter frame da fonte de imagem
                 frame = self.vm.image_source.get_frame()
                 if frame is not None:
@@ -346,9 +377,14 @@ class TestModeProcessor:
                 else:
                     logger.warning("⚠️ Nenhum frame obtido da fonte de imagem")
                 
-                # Aguardar conforme configuração de trigger (reduzido para teste)
-                interval_ms = self.vm.trigger_config.get('interval_ms', 500)  # 500ms em vez de 2000ms
-                time.sleep(interval_ms / 1000.0)
+                # Aguardar conforme configuração de trigger
+                if trigger_type == 'continuous':
+                    # Modo contínuo: usar intervalo configurado
+                    interval_ms = self.vm.trigger_config.get('interval_ms', 500)
+                    time.sleep(interval_ms / 1000.0)
+                elif trigger_type == 'trigger':
+                    # Modo gatilho: aguardar próximo trigger
+                    time.sleep(0.1)  # Verificação rápida para novos triggers
                 
             except Exception as e:
                 error_message = f"Erro crítico no loop de processamento: {str(e)}"
@@ -364,23 +400,42 @@ class TestModeProcessor:
                 break
     
     def _process_frame(self, frame: np.ndarray) -> Dict[str, Any]:
-        """Processa um frame (simulação de inspeção)"""
+        """Processa um frame usando sistema de ferramentas ou simulação"""
         try:
             start_time = time.time()
             
-            # Simulação de processamento de inspeção
-            # Aqui você implementaria sua lógica real de inspeção
-            processing_time = np.random.uniform(10, 50)  # Simular tempo de processamento
-            time.sleep(processing_time / 1000.0)  # Converter para segundos
-            
-            # Simular resultado de aprovação/reprovação
-            approved = np.random.choice([True, False], p=[0.8, 0.2])  # 80% aprovado
-            
-            # Calcular tempo total
-            total_time = (time.time() - start_time) * 1000  # Converter para milissegundos
-            
-            return {
-                'approved': approved,
+            # Verificar se há processador de ferramentas disponível
+            if hasattr(self.vm, 'inspection_processor') and self.vm.inspection_processor:
+                # Usar sistema de ferramentas
+                logger.info("🔧 Processando frame com sistema de ferramentas...")
+                inspection_result = self.vm.inspection_processor.process_inspection(frame)
+                
+                # Extrair resultado de aprovação
+                overall_pass = inspection_result.get('inspection_summary', {}).get('overall_pass', True)
+                approved = overall_pass
+                
+                # Calcular tempo total
+                total_time = (time.time() - start_time) * 1000
+                
+                # Enviar resultado completo via WebSocket
+                self._send_inspection_result(inspection_result)
+                
+                return {
+                    'approved': approved,
+                    'processing_time_ms': total_time,
+                    'inspection_result': inspection_result
+                }
+            else:
+                # Fallback para simulação (comportamento anterior)
+                logger.info("🎲 Processando frame com simulação (sem ferramentas)...")
+                processing_time = np.random.uniform(10, 50)
+                time.sleep(processing_time / 1000.0)
+                
+                approved = np.random.choice([True, False], p=[0.8, 0.2])
+                total_time = (time.time() - start_time) * 1000
+                
+                return {
+                    'approved': approved,
                 'processing_time_ms': int(total_time),
                 'frame_shape': frame.shape,
                 'timestamp': datetime.utcnow().isoformat()
@@ -405,13 +460,39 @@ class TestModeProcessor:
             try:
                 # Preparar dados para WebSocket
                 source_type = self.vm.image_source.source_type if self.vm.image_source else 'none'
+                
+                # Extrair timestamp baseado no tipo de resultado
+                if 'timestamp' in result:
+                    # Resultado do sistema antigo (simulação)
+                    timestamp = result['timestamp']
+                elif 'inspection_result' in result and 'timestamp' in result['inspection_result']:
+                    # Resultado do sistema de ferramentas
+                    timestamp = result['inspection_result']['timestamp']
+                else:
+                    # Fallback: usar timestamp atual
+                    timestamp = datetime.now().isoformat()
+                
+                # Extrair informações baseadas no tipo de resultado
+                if 'inspection_result' in result:
+                    # Sistema de ferramentas - usar dados completos da inspeção
+                    inspection_summary = result['inspection_result']['inspection_summary']
+                    total_time = inspection_summary.get('total_processing_time_ms', 0)
+                    tools_config = self.vm.inspection_config.get('tools', [])
+                    tools_results = result['inspection_result']['tool_results']
+                else:
+                    # Sistema antigo (simulação) - usar dados básicos
+                    total_time = result.get('processing_time_ms', 0)
+                    tools_config = []
+                    tools_results = []
+                
                 websocket_data = {
                     'aprovados': self.approved_count,
                     'reprovados': self.rejected_count,
                     'frame': self.frame_count,
-                    'time': f"{result['processing_time_ms']}ms",
-                    'tools': {},
-                    'timestamp': result['timestamp'],
+                    'time': f"{total_time:.2f}ms",
+                    'tools': tools_config,  # JSON de configuração da inspeção
+                    'result': tools_results,  # Lista resultante de todos os processos das tools
+                    'timestamp': timestamp,
                     'source_type': source_type,
                     'mode': self.vm.mode
                 }
@@ -433,6 +514,21 @@ class TestModeProcessor:
                 self.running = False
         else:
             logger.debug(f"⏳ WebSocket rate-limited: {self.websocket_update_interval - (current_time - self.last_websocket_update):.2f}s restantes")
+    
+    def _send_inspection_result(self, inspection_result: Dict[str, Any]):
+        """Envia resultado completo de inspeção via WebSocket"""
+        try:
+            # Enviar resultado de inspeção via WebSocket
+            self.socketio.emit('inspection_result', {
+                'status': 'success',
+                'inspection_result': inspection_result,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            logger.info("📡 Resultado de inspeção enviado via WebSocket")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar resultado de inspeção via WebSocket: {str(e)}")
 
 class VisionMachine:
     """Classe principal da máquina de visão computacional"""
@@ -458,6 +554,18 @@ class VisionMachine:
             # Criar um source vazio para evitar quebra
             self.image_source = None
             logger.warning("⚠️ VM inicializada com erro, mas servidor continuará funcionando")
+        
+        # Inicializar processador de inspeção com ferramentas
+        self.inspection_processor = None
+        if TOOLS_AVAILABLE and hasattr(self, 'inspection_config') and self.inspection_config.get('tools'):
+            try:
+                self.inspection_processor = InspectionProcessor(self.inspection_config)
+                logger.info(f"✅ Processador de ferramentas inicializado com {len(self.inspection_processor.tools)} ferramentas")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao inicializar processador de ferramentas: {str(e)}")
+                self.inspection_processor = None
+        else:
+            logger.info("ℹ️ Processador de ferramentas não configurado ou não disponível")
         
         logger.info(f"VM {machine_id} inicializada em modo {self.mode}")
         
@@ -524,8 +632,8 @@ class VisionMachine:
         }
         
         self.trigger_config = {
-            "type": "continuous",
-            "interval_ms": 500  # 500ms para processamento mais rápido
+            "type": "continuous",  # "continuous" ou "trigger"
+            "interval_ms": 500    # 500ms para processamento mais rápido (apenas modo contínuo)
         }
 
     def save_config(self):
@@ -606,16 +714,53 @@ class VisionMachine:
 
     def update_trigger_config(self, new_config: Dict[str, Any]):
         """Atualiza configuração de trigger e salva"""
-        # Atualizar configuração
-        self.trigger_config.update(new_config)
-        # Sempre salvar após atualização
-        self.save_config()
-        logger.info("Configuração de trigger atualizada e salva")
+        try:
+            # Validar configuração de trigger
+            self._validate_trigger_config(new_config)
+            
+            # Atualizar configuração
+            self.trigger_config.update(new_config)
+            
+            # Sempre salvar após atualização
+            self.save_config()
+            logger.info("Configuração de trigger atualizada e salva")
+            
+        except Exception as e:
+            error_message = f"Erro ao atualizar configuração de trigger: {str(e)}"
+            logger.error(error_message)
+            raise Exception(error_message)
+    
+    def _validate_trigger_config(self, config: Dict[str, Any]):
+        """Valida configuração de trigger"""
+        trigger_type = config.get('type')
+        
+        if trigger_type not in ['continuous', 'trigger']:
+            raise ValueError(f"Tipo de trigger inválido: {trigger_type}. Deve ser 'continuous' ou 'trigger'")
+        
+        if trigger_type == 'continuous':
+            interval_ms = config.get('interval_ms', 100)
+            if interval_ms < 100:  # Mínimo de 100ms para evitar sobrecarga
+                raise ValueError(f"Intervalo muito baixo para modo contínuo: {interval_ms}ms. Mínimo: 100ms")
+        
+        logger.info(f"✅ Configuração de trigger válida: tipo={trigger_type}")
 
     def update_inspection_config(self, new_config: Dict[str, Any]):
         """Atualiza configuração de inspeção e salva"""
         # Atualizar configuração
         self.inspection_config.update(new_config)
+        
+        # Recriar inspection_processor com nova configuração
+        if TOOLS_AVAILABLE and self.inspection_config.get('tools'):
+            try:
+                self.inspection_processor = InspectionProcessor(self.inspection_config)
+                logger.info(f"✅ Processador de ferramentas recriado com {len(self.inspection_processor.tools)} ferramentas")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao recriar processador de ferramentas: {str(e)}")
+                self.inspection_processor = None
+        else:
+            logger.info("ℹ️ Processador de ferramentas não configurado ou não disponível")
+            self.inspection_processor = None
+        
         # Sempre salvar após atualização
         self.save_config()
         logger.info("Configuração de inspeção atualizada e salva")
@@ -805,6 +950,19 @@ class FlaskVisionServer:
         @self.app.route('/api/status', methods=['GET'])
         def get_status():
             """Retorna o status atual da VM"""
+            # Informações adicionais sobre trigger
+            trigger_info = {
+                "type": self.vm.trigger_config.get('type', 'continuous'),
+                "interval_ms": self.vm.trigger_config.get('interval_ms', 500),
+                "waiting_for_trigger": False
+            }
+            
+            # Se estiver em modo gatilho e rodando, verificar se está aguardando
+            if (self.vm.trigger_config.get('type') == 'trigger' and 
+                self.vm.status == 'running' and 
+                hasattr(self.test_processor, 'trigger_requested')):
+                trigger_info["waiting_for_trigger"] = not self.test_processor.trigger_requested
+            
             return jsonify({
                 "machine_id": self.vm.machine_id,
                 "status": self.vm.status,
@@ -814,6 +972,7 @@ class FlaskVisionServer:
                 "timestamp": datetime.utcnow().isoformat(),
                 "source_config": self.vm.source_config,
                 "trigger_config": self.vm.trigger_config,
+                "trigger_info": trigger_info,
                 "source_available": self.vm.image_source is not None
             })
         
@@ -884,6 +1043,26 @@ class FlaskVisionServer:
                     logger.info("Inspeção parada")
                     return jsonify({"success": True})
                 
+                elif command == 'trigger':
+                    logger.info("🔘 Comando trigger recebido")
+                    
+                    # Verificar se está em modo gatilho
+                    if self.vm.trigger_config.get('type') != 'trigger':
+                        error_msg = "Comando trigger só é válido quando trigger_config.type = 'trigger'"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 400
+                    
+                    # Verificar se inspeção está rodando
+                    if self.vm.status != 'running':
+                        error_msg = "Comando trigger só é válido quando inspeção está rodando"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 400
+                    
+                    # Solicitar trigger no processador
+                    self.test_processor.request_trigger()
+                    logger.info("✅ Trigger solicitado com sucesso")
+                    return jsonify({"success": True, "message": "Trigger solicitado"})
+                
                 else:
                     return jsonify({"success": False, "error": "Comando não reconhecido"}), 400
                     
@@ -915,6 +1094,20 @@ class FlaskVisionServer:
                     data = request.get_json()
                     self.vm.update_trigger_config(data)
                     logger.info("Configuração de trigger atualizada")
+                    return jsonify({"success": True})
+                except Exception as e:
+                    return jsonify({"success": False, "error": str(e)}), 500
+        
+        @self.app.route('/api/inspection_config', methods=['GET', 'PUT'])
+        def inspection_config():
+            """Gerencia configuração local de inspeção"""
+            if request.method == 'GET':
+                return jsonify(self.vm.inspection_config)
+            else:
+                try:
+                    data = request.get_json()
+                    self.vm.update_inspection_config(data)
+                    logger.info("Configuração de inspeção atualizada")
                     return jsonify({"success": True})
                 except Exception as e:
                     return jsonify({"success": False, "error": str(e)}), 500

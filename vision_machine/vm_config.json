@@ -4,12 +4,51 @@
   "status": "idle",
   "mode": "TESTE",
   "connection_status": "disconnected",
-  "inspection_config": {},
+  "inspection_config": {
+    "tools": [
+      {
+        "id": 1,
+        "name": "grayscale_filter",
+        "type": "grayscale",
+        "ROI": {
+          "x": 0,
+          "y": 0,
+          "w": 752,
+          "h": 480
+        },
+        "method": "luminance",
+        "normalize": true,
+        "inspec_pass_fail": false
+      },
+      {
+        "id": 2,
+        "name": "blob_1",
+        "type": "blob",
+        "ROI": {
+          "x": 0,
+          "y": 0,
+          "w": 752,
+          "h": 480
+        },
+        "th_max": 255,
+        "th_min": 130,
+        "area_min": 100,
+        "area_max": 10000,
+        "test_total_area_max": 100,
+        "test_total_area_min": 50,
+        "test_blob_count_max": 5,
+        "test_blob_count_min": 4,
+        "total_area_test": true,
+        "blob_count_test": true,
+        "inspec_pass_fail": true
+      }
+    ]
+  },
   "source_config": {
     "type": "pasta",
     "camera_id": 999,
     "resolution": [
-      640,
+      752,
       480
     ],
     "fps": 30,
@@ -21,5 +60,5 @@
     "interval_ms": 1000
   },
   "error_msg": "",
-  "last_saved": "2025-08-16T03:59:41.148948"
+  "last_saved": "2025-08-17T05:26:51.063391"
 }

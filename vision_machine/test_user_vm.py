@@ -46,11 +46,15 @@ class VMController:
         print("  14. source_pasta <caminho> - Configura source para pasta")
         print("  15. source_camera <id> - Configura source para câmera local")
         print("  16. source_rtsp <url> - Configura source para câmera IP")
-        print("  17. help           - Mostra este menu")
-        print("  18. end            - Finaliza o programa")
+        print("  17. trigger_continuous <ms> - Configura trigger contínuo")
+        print("  18. trigger_trigger - Configura trigger gatilho")
+        print("  19. send_trigger   - Envia trigger manual (modo gatilho)")
+        print("  20. help           - Mostra este menu")
+        print("  21. end            - Finaliza o programa")
         print("="*60)
         print("💡 Exemplos: mode TESTE, start, status, set_error 'Falha na câmera'")
         print("💡 Source: source_pasta './minhas_imagens', source_camera 1, source_rtsp 'rtsp://192.168.1.100:554'")
+        print("💡 Trigger: trigger_continuous 1000, trigger_trigger, send_trigger")
         print("💡 Use Ctrl+C para sair a qualquer momento")
         print("="*60)
     
@@ -117,6 +121,19 @@ class VMController:
                     self.set_source_rtsp(rtsp_url)
                 else:
                     print("❌ Uso: source_rtsp <url>")
+            elif cmd == "trigger_continuous":
+                if len(parts) > 1:
+                    try:
+                        interval_ms = int(parts[1])
+                        self.set_trigger_continuous(interval_ms)
+                    except ValueError:
+                        print("❌ Intervalo deve ser um número")
+                else:
+                    print("❌ Uso: trigger_continuous <ms>")
+            elif cmd == "trigger_trigger":
+                self.set_trigger_trigger()
+            elif cmd == "send_trigger":
+                self.send_manual_trigger()
             elif cmd == "help":
                 self.show_menu()
             elif cmd == "end":
@@ -337,11 +354,80 @@ class VMController:
         
         print(f"\n📊 RESULTADOS RECEBIDOS ({len(self.test_results)}):")
         for i, result in enumerate(self.test_results, 1):
-            print(f"  {i}. Frame {result.get('frame', 'N/A')} - {result.get('time', 'N/A')}")
-            print(f"     Aprovados: {result.get('aprovados', 'N/A')} | Reprovados: {result.get('reprovados', 'N/A')}")
-            print(f"     Timestamp: {result.get('timestamp', 'N/A')}")
+            print(f"\n{'='*60}")
+            print(f"🎯 RESULTADO {i} - Frame {result.get('frame', 'N/A')}")
+            print(f"{'='*60}")
+            
+            # Informações básicas
+            print(f"⏱️  Tempo de Processamento: {result.get('time', 'N/A')}")
+            print(f"📊 Estatísticas: Aprovados {result.get('aprovados', 'N/A')} | Reprovados {result.get('reprovados', 'N/A')}")
+            print(f"🕐 Timestamp: {result.get('timestamp', 'N/A')}")
+            print(f"📷 Source: {result.get('source_type', 'N/A')} | Mode: {result.get('mode', 'N/A')}")
+            
+            # Configuração das ferramentas
+            tools_config = result.get('tools', [])
+            if tools_config:
+                print(f"\n🔧 FERRAMENTAS CONFIGURADAS ({len(tools_config)}):")
+                for j, tool in enumerate(tools_config, 1):
+                    print(f"   {j}. {tool.get('name', 'N/A')} (ID: {tool.get('id', 'N/A')})")
+                    print(f"      Tipo: {tool.get('type', 'N/A')}")
+                    if tool.get('ROI'):
+                        roi = tool['ROI']
+                        print(f"      ROI: ({roi.get('x', 0)},{roi.get('y', 0)}) {roi.get('w', 0)}x{roi.get('h', 0)}")
+                    if tool.get('inspec_pass_fail'):
+                        print(f"      Pass/Fail: {'✅ Sim' if tool['inspec_pass_fail'] else '❌ Não'}")
+            
+            # Resultados das ferramentas
+            tools_results = result.get('result', [])
+            if tools_results:
+                print(f"\n📈 RESULTADOS DAS FERRAMENTAS ({len(tools_results)}):")
+                for j, tool_result in enumerate(tools_results, 1):
+                    print(f"   {j}. {tool_result.get('tool_name', 'N/A')} (ID: {tool_result.get('tool_id', 'N/A')})")
+                    print(f"      Tipo: {tool_result.get('tool_type', 'N/A')}")
+                    print(f"      Status: {tool_result.get('status', 'N/A')}")
+                    print(f"      Tempo: {tool_result.get('processing_time_ms', 0):.2f}ms")
+                    
+                    # Detalhes específicos por tipo de ferramenta
+                    if tool_result.get('tool_type') == 'blob':
+                        print(f"      Blobs: {tool_result.get('blob_count', 0)}")
+                        print(f"      Área Total: {tool_result.get('total_area', 0):.2f}")
+                        print(f"      Pass/Fail: {'✅ PASSOU' if tool_result.get('pass_fail') else '❌ FALHOU' if tool_result.get('pass_fail') is False else 'N/A'}")
+                        
+                        # Testes internos
+                        test_results = tool_result.get('test_results', {})
+                        if test_results:
+                            print(f"      Testes Internos:")
+                            for test_name, test_data in test_results.items():
+                                if test_name != 'overall_pass' and isinstance(test_data, dict):
+                                    passed = test_data.get('passed', False)
+                                    actual = test_data.get('actual', 'N/A')
+                                    print(f"        {test_name}: {'✅' if passed else '❌'} (Valor: {actual})")
+                    
+                    elif tool_result.get('tool_type') == 'grayscale':
+                        print(f"      Imagem Modificada: {'✅ Sim' if tool_result.get('image_modified') else '❌ Não'}")
+                    
+                    elif tool_result.get('tool_type') == 'math':
+                        print(f"      Operação: {tool_result.get('operation', 'N/A')}")
+                        print(f"      Resultado: {tool_result.get('result', 'N/A')}")
+                        print(f"      Pass/Fail: {'✅ PASSOU' if tool_result.get('pass_fail') else '❌ FALHOU' if tool_result.get('pass_fail') is False else 'N/A'}")
+                    
+                    # Erro se houver
+                    if tool_result.get('status') == 'error':
+                        print(f"      ❌ Erro: {tool_result.get('error', 'N/A')}")
+                    
+                    print()  # Linha em branco entre ferramentas
+            
+            # Resumo final
+            print(f"\n📋 RESUMO:")
+            print(f"   🎯 Frame processado com sucesso")
+            print(f"   ⏱️  Tempo total: {result.get('time', 'N/A')}")
+            if tools_results:
+                successful_tools = len([r for r in tools_results if r.get('status') == 'success'])
+                total_tools = len(tools_results)
+                print(f"   🔧 Ferramentas: {successful_tools}/{total_tools} bem-sucedidas")
+            
             if i < len(self.test_results):
-                print()
+                print(f"\n{'='*60}")
     
     def clear_results(self):
         """Limpa resultados recebidos"""
@@ -478,6 +564,77 @@ class VMController:
         except Exception as e:
             print(f"❌ Erro ao configurar source: {str(e)}")
     
+    def set_trigger_continuous(self, interval_ms: int):
+        """Configura trigger contínuo"""
+        try:
+            data = {
+                "type": "continuous",
+                "interval_ms": interval_ms
+            }
+            response = requests.put(
+                f"{self.vm_url}/api/trigger_config",
+                json=data,
+                headers={"Content-Type": "application/json"}
+            )
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Trigger contínuo configurado para {interval_ms}ms")
+                # Verificar configuração após mudança
+                time.sleep(0.5)
+                self.get_trigger_config()
+            else:
+                print(f"❌ Erro ao configurar trigger contínuo: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Erro ao configurar trigger contínuo: {str(e)}")
+    
+    def set_trigger_trigger(self):
+        """Configura trigger gatilho"""
+        try:
+            data = {
+                "type": "trigger"
+            }
+            response = requests.put(
+                f"{self.vm_url}/api/trigger_config",
+                json=data,
+                headers={"Content-Type": "application/json"}
+            )
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Trigger gatilho configurado")
+                # Verificar configuração após mudança
+                time.sleep(0.5)
+                self.get_trigger_config()
+            else:
+                print(f"❌ Erro ao configurar trigger gatilho: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Erro ao configurar trigger gatilho: {str(e)}")
+    
+
+
+    def send_manual_trigger(self):
+        """Envia um trigger manual (apenas se o modo for gatilho)"""
+        if not self.connected or not self.socketio:
+            print("⚠️ Não conectado ao WebSocket ou modo não é gatilho. Não é possível enviar trigger manual.")
+            return
+        
+        try:
+            data = {"command": "trigger"}
+            response = requests.post(
+                f"{self.vm_url}/api/control",
+                json=data,
+                headers={"Content-Type": "application/json"}
+            )
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Trigger manual enviado: {result['message']}")
+                # Verificar status após envio do trigger
+                time.sleep(0.5)
+                self.get_status()
+            else:
+                print(f"❌ Erro ao enviar trigger manual: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Erro ao enviar trigger manual: {str(e)}")
+
     def run(self):
         """Executa o controlador interativo"""
         print("🚀 Iniciando Controlador Interativo da Vision Machine...")

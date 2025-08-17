@@ -392,7 +392,7 @@ def test_websocket_with_processing():
     """Teste WebSocket com processamento ativo"""
     print("\n🧪 TESTANDO WEBSOCKET COM PROCESSAMENTO...")
     
-    # Pré-requisito: Garantir que source esteja configurado para pasta
+    # Pré-requisito 1: Garantir que source esteja configurado para pasta
     print("\n0️⃣ Configurando source para pasta antes do teste...")
     try:
         data = {
@@ -409,7 +409,24 @@ def test_websocket_with_processing():
         print(f"❌ Erro ao configurar source para pasta: {str(e)}")
         return False
     
-    # Aguardar um pouco para a configuração ser aplicada
+    # Pré-requisito 2: Garantir que trigger esteja configurado como contínuo
+    print("\n1️⃣ Configurando trigger como contínuo antes do teste...")
+    try:
+        data = {
+            "type": "continuous",
+            "interval_ms": 500  # Intervalo menor para teste mais rápido
+        }
+        response = requests.put(f"{VM_URL}/api/trigger_config", json=data)
+        if response.status_code == 200:
+            print("✅ Trigger configurado como contínuo com sucesso")
+        else:
+            print(f"❌ Erro ao configurar trigger contínuo: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Erro ao configurar trigger contínuo: {str(e)}")
+        return False
+    
+    # Aguardar um pouco para as configurações serem aplicadas
     time.sleep(1)
     
     try:
@@ -640,12 +657,233 @@ def test_cleanup():
         else:
             print(f"⚠️ Não foi possível restaurar source: {response.status_code}")
         
+        # Restaurar configuração de trigger padrão
+        data = {
+            "type": "continuous",
+            "interval_ms": 1000
+        }
+        response = requests.put(f"{VM_URL}/api/trigger_config", json=data)
+        if response.status_code == 200:
+            print("✅ Configuração de trigger restaurada")
+        else:
+            print(f"⚠️ Não foi possível restaurar trigger: {response.status_code}")
+        
         print("✅ Limpeza concluída")
         return True
         
     except Exception as e:
         print(f"❌ Erro durante limpeza: {str(e)}")
         return False
+
+def test_trigger_modes():
+    """Testa os dois tipos de trigger: contínuo e gatilho"""
+    print("\n🧪 TESTANDO MODOS DE TRIGGER...")
+    
+    # Pré-requisito: Garantir que source esteja configurado para pasta
+    print("\n0️⃣ Configurando source para pasta antes do teste...")
+    try:
+        data = {
+            "type": "pasta",
+            "folder_path": "./test_images"
+        }
+        response = requests.put(f"{VM_URL}/api/source_config", json=data)
+        if response.status_code == 200:
+            print("✅ Source configurado para pasta com sucesso")
+        else:
+            print(f"❌ Erro ao configurar source para pasta: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Erro ao configurar source para pasta: {str(e)}")
+        return False
+    
+    # Aguardar um pouco para a configuração ser aplicada
+    time.sleep(1)
+    
+    # Teste 1: Modo Contínuo
+    print("\n1️⃣ Testando modo contínuo...")
+    try:
+        # Configurar modo contínuo
+        data = {
+            "type": "continuous",
+            "interval_ms": 1000
+        }
+        response = requests.put(f"{VM_URL}/api/trigger_config", json=data)
+        if response.status_code == 200:
+            print("✅ Trigger configurado para modo contínuo")
+        else:
+            print(f"❌ Erro ao configurar trigger contínuo: {response.status_code}")
+            return False
+        
+        # Verificar configuração
+        response = requests.get(f"{VM_URL}/api/trigger_config")
+        if response.status_code == 200:
+            config = response.json()
+            print(f"   📊 Tipo: {config['type']}")
+            print(f"   ⏱️ Intervalo: {config['interval_ms']}ms")
+        else:
+            print(f"❌ Erro ao verificar configuração: {response.status_code}")
+            return False
+        
+        # Iniciar inspeção
+        data = {"command": "start_inspection"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code == 200:
+            print("✅ Inspeção contínua iniciada")
+        else:
+            print(f"❌ Erro ao iniciar inspeção contínua: {response.status_code}")
+            return False
+        
+        # Aguardar algumas execuções automáticas
+        print("   ⏳ Aguardando execuções automáticas...")
+        time.sleep(5)
+        
+        # Verificar status
+        response = requests.get(f"{VM_URL}/api/status")
+        if response.status_code == 200:
+            status_data = response.json()
+            print(f"   📊 Status: {status_data['status']}")
+            print(f"   🔄 Trigger info: {status_data.get('trigger_info', 'N/A')}")
+        
+        # Parar inspeção
+        data = {"command": "stop_inspection"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code == 200:
+            print("✅ Inspeção contínua parada")
+        else:
+            print(f"⚠️ Erro ao parar inspeção: {response.status_code}")
+        
+    except Exception as e:
+        print(f"❌ Erro no teste de modo contínuo: {str(e)}")
+        return False
+    
+    # Aguardar um pouco entre os testes
+    time.sleep(2)
+    
+    # Teste 2: Modo Gatilho
+    print("\n2️⃣ Testando modo gatilho...")
+    try:
+        # Configurar modo gatilho
+        data = {"type": "trigger"}
+        response = requests.put(f"{VM_URL}/api/trigger_config", json=data)
+        if response.status_code == 200:
+            print("✅ Trigger configurado para modo gatilho")
+        else:
+            print(f"❌ Erro ao configurar trigger gatilho: {response.status_code}")
+            return False
+        
+        # Verificar configuração
+        response = requests.get(f"{VM_URL}/api/trigger_config")
+        if response.status_code == 200:
+            config = response.json()
+            print(f"   📊 Tipo: {config['type']}")
+        else:
+            print(f"❌ Erro ao verificar configuração: {response.status_code}")
+            return False
+        
+        # Iniciar inspeção
+        data = {"command": "start_inspection"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code == 200:
+            print("✅ Inspeção em modo gatilho iniciada")
+        else:
+            print(f"❌ Erro ao iniciar inspeção em modo gatilho: {response.status_code}")
+            return False
+        
+        # Verificar se está aguardando trigger
+        time.sleep(1)
+        response = requests.get(f"{VM_URL}/api/status")
+        if response.status_code == 200:
+            status_data = response.json()
+            trigger_info = status_data.get('trigger_info', {})
+            if trigger_info.get('waiting_for_trigger'):
+                print("✅ VM aguardando trigger")
+            else:
+                print("⚠️ VM não está aguardando trigger")
+        
+        # Enviar alguns triggers
+        for i in range(3):
+            print(f"   🔘 Enviando trigger {i+1}/3...")
+            data = {"command": "trigger"}
+            response = requests.post(f"{VM_URL}/api/control", json=data)
+            if response.status_code == 200:
+                print(f"      ✅ Trigger {i+1} executado com sucesso")
+            else:
+                print(f"      ❌ Erro no trigger {i+1}: {response.status_code}")
+                return False
+            
+            # Aguardar processamento
+            time.sleep(2)
+        
+        # Verificar status final
+        response = requests.get(f"{VM_URL}/api/status")
+        if response.status_code == 200:
+            status_data = response.json()
+            print(f"   📊 Status final: {status_data['status']}")
+            print(f"   🔄 Trigger info: {status_data.get('trigger_info', 'N/A')}")
+        
+        # Parar inspeção
+        data = {"command": "stop_inspection"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code == 200:
+            print("✅ Inspeção em modo gatilho parada")
+        else:
+            print(f"⚠️ Erro ao parar inspeção: {response.status_code}")
+        
+    except Exception as e:
+        print(f"❌ Erro no teste de modo gatilho: {str(e)}")
+        return False
+    
+    # Teste 3: Validações de trigger
+    print("\n3️⃣ Testando validações de trigger...")
+    try:
+        # Tentar usar comando trigger em modo contínuo (deve falhar)
+        print("   🔍 Testando trigger em modo contínuo...")
+        
+        # Configurar modo contínuo
+        data = {"type": "continuous", "interval_ms": 1000}
+        response = requests.put(f"{VM_URL}/api/trigger_config", json=data)
+        if response.status_code != 200:
+            print(f"      ❌ Erro ao configurar modo contínuo: {response.status_code}")
+            return False
+        
+        # Iniciar inspeção
+        data = {"command": "start_inspection"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code != 200:
+            print(f"      ❌ Erro ao iniciar inspeção: {response.status_code}")
+            return False
+        
+        # Tentar comando trigger (deve falhar)
+        data = {"command": "trigger"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code == 400:
+            print("      ✅ Comportamento correto: trigger rejeitado em modo contínuo")
+        else:
+            print(f"      ❌ Comportamento incorreto: {response.status_code}")
+            return False
+        
+        # Parar inspeção
+        data = {"command": "stop_inspection"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code != 200:
+            print(f"      ⚠️ Erro ao parar inspeção: {response.status_code}")
+        
+        # Tentar comando trigger sem inspeção rodando (deve falhar)
+        print("   🔍 Testando trigger sem inspeção rodando...")
+        data = {"command": "trigger"}
+        response = requests.post(f"{VM_URL}/api/control", json=data)
+        if response.status_code == 400:
+            print("      ✅ Comportamento correto: trigger rejeitado sem inspeção")
+        else:
+            print(f"      ❌ Comportamento incorreto: {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Erro no teste de validações: {str(e)}")
+        return False
+    
+    print("✅ Testes de trigger concluídos com sucesso")
+    return True
 
 def main():
     """Função principal de teste"""
@@ -661,7 +899,8 @@ def main():
         ("WebSocket Básico", test_websocket_basic),
         ("WebSocket com Processamento", test_websocket_with_processing),
         ("Sistema de Tratamento de Erros", test_error_handling),
-        ("Limpeza", test_cleanup)
+        ("Limpeza", test_cleanup),
+        ("Modos de Trigger", test_trigger_modes)
     ]
     
     # Executar testes

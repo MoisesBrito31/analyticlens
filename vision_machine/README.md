@@ -1,400 +1,234 @@
-# AnalyticLens - Vision Machine (VM)
+# 🎯 Vision Machine (VM) - Sistema de Visão Computacional
 
-## 📋 Visão Geral
+## 📋 **Visão Geral**
 
-A **Vision Machine (VM)** é um servidor Flask robusto e inteligente para máquinas de visão computacional. O sistema implementa uma arquitetura modular com persistência automática, tratamento robusto de erros, e comunicação em tempo real via WebSocket.
+A Vision Machine é um servidor Flask robusto para visão computacional que se comunica via REST API e WebSocket. O sistema oferece processamento de imagens em tempo real com configuração flexível de fontes de imagem e modos de operação.
 
-## 🚀 Funcionalidades Principais
+## ✨ **Funcionalidades Principais**
 
-### ✨ **Sistema Robusto e Auto-Recuperável**
-- **Persistência automática**: Configurações salvas automaticamente em `vm_config.json`
-- **Auto-start inteligente**: Inicia inspeção automaticamente quando possível
-- **Recriação automática**: Recria `ImageSource` quando necessário
-- **Tratamento de erros**: Sistema robusto de recuperação sem quebrar a aplicação
+### **🔧 Sistema de Ferramentas Modular**
+- **Pipeline de Inspeção**: Configuração JSON para criar receitas de processamento
+- **Ferramentas Disponíveis**: Grayscale (filtro), Blob (análise), Math (cálculos)
+- **Execução Sequencial**: Processamento otimizado com cache de imagens
+- **Referências entre Ferramentas**: Uma ferramenta pode usar resultados de outra
 
-### 🎯 **Gerenciamento de Imagens Inteligente**
-- **3 tipos de source**: `pasta`, `camera`, `camera_IP` (RTSP)
-- **Fila cíclica**: Processamento contínuo de imagens de pasta
-- **Fallback automático**: Tenta recriar source em caso de erro
-- **Validação robusta**: Verifica disponibilidade antes de processar
+### **📷 Fontes de Imagem Flexíveis**
+- **Pasta de Imagens**: Processamento de arquivos locais
+- **Câmera Local**: Captura direta via OpenCV
+- **Câmera IP**: Stream RTSP/HTTP
 
-### 🔄 **Modos de Operação**
-- **TESTE**: Modo de desenvolvimento com processamento simulado
-- **RUN**: Modo de produção (preparado para implementação real)
-- **Transição automática**: Entre modos com validação
+### **⚡ Modos de Operação**
+- **Contínuo**: Inspeção automática em intervalos configuráveis
+- **Trigger**: Inspeção sob demanda via comando REST
 
-### 📡 **Comunicação em Tempo Real**
-- **WebSocket SocketIO**: Comunicação bidirecional
-- **Rate limiting**: 1 atualização por segundo para modo teste
-- **Eventos estruturados**: `test_result`, `status_update`, `connected`
+### **🌐 Comunicação em Tempo Real**
+- **REST API**: Controle e configuração
+- **WebSocket**: Resultados de inspeção em tempo real
+- **Eventos**: `inspection_result`, `test_result`
 
-## 🏗️ Arquitetura do Sistema
+## 🏗️ **Arquitetura**
 
-### **Classes Principais**
-
-#### **VisionMachine** - Cérebro do Sistema
-```python
-class VisionMachine:
-    # Gerencia estado, configurações e componentes
-    - Estado: idle, running, error
-    - Persistência automática em JSON
-    - Auto-start de inspeção
-    - Gerenciamento de erros
+### **Componentes Principais**
+```
+VisionMachine (Core)
+├── InspectionProcessor (Sistema de Ferramentas)
+│   ├── BaseTool (Classe Abstrata)
+│   ├── GrayscaleTool (Filtro)
+│   ├── BlobTool (Análise)
+│   └── MathTool (Matemática)
+├── ImageSource (Fontes de Imagem)
+├── TestModeProcessor (Processamento)
+└── FlaskVisionServer (API + WebSocket)
 ```
 
-#### **ImageSource** - Gerenciador de Fontes
-```python
-class ImageSource:
-    # Gerencia diferentes tipos de entrada de imagem
-    - pasta: Fila cíclica de arquivos
-    - camera: Câmera local via OpenCV
-    - camera_IP: Stream RTSP
-    - Recriação automática em caso de erro
-```
+### **Fluxo de Processamento**
+1. **Captura**: Imagem da fonte configurada
+2. **Pipeline**: Execução sequencial das ferramentas
+3. **Cache**: Reutilização de imagens processadas
+4. **Análise**: Resultados com métricas de tempo
+5. **WebSocket**: Envio dos resultados em tempo real
 
-#### **TestModeProcessor** - Processador de Teste
-```python
-class TestModeProcessor:
-    # Processa frames em modo teste
-    - Thread assíncrono de processamento
-    - Simulação de inspeção
-    - WebSocket com rate limiting
-    - Tratamento robusto de erros
-```
+## 🚀 **Início Rápido**
 
-#### **FlaskVisionServer** - Servidor Web
-```python
-class FlaskVisionServer:
-    # Servidor Flask principal
-    - API REST completa
-    - WebSocket SocketIO
-    - Handlers de shutdown graceful
-    - Auto-start de inspeção
-```
-
-## 🔧 Configuração e Uso
-
-### **Instalação de Dependências**
+### **1. Instalação**
 ```bash
+cd vision_machine
 pip install -r requirements.txt
 ```
 
-### **Execução Básica**
+### **2. Configuração**
+Edite `vm_config.json` para configurar:
+- Fonte de imagem
+- Modo de trigger
+- Pipeline de ferramentas
+
+### **3. Execução**
 ```bash
 python vm.py
 ```
 
-### **Execução com Parâmetros**
-```bash
-python vm.py --machine-id vm_001 --port 5000 --debug
-```
+### **4. Acesso**
+- **API**: http://localhost:5000
+- **WebSocket**: ws://localhost:5000
 
-### **Parâmetros Disponíveis**
-- `--machine-id`: ID único da máquina (padrão: vm_001)
-- `--django-url`: URL do Django orquestrador (padrão: http://localhost:8000)
-- `--config-file`: Arquivo de configuração personalizado
-- `--host`: Host para bind do servidor (padrão: 0.0.0.0)
-- `--port`: Porta do servidor (padrão: 5000)
-- `--debug`: Modo debug
+## 📚 **Documentação**
 
-## 📡 API REST
+### **📖 Guias Principais**
+- **[TOOLS_README.md](TOOLS_README.md)**: Sistema de ferramentas completo
+- **[Protocolo/](Protocolo/)**: Especificações técnicas detalhadas
+- **[modelagem/](modelagem/)**: Diagramas UML e arquiteturais
 
-### **Endpoints Principais**
+### **🔧 Ferramentas Disponíveis**
+- **GrayscaleTool**: Conversão para escala de cinza
+- **BlobTool**: Detecção e análise de blobs
+- **MathTool**: Operações matemáticas sobre resultados
 
-#### **GET /api/status**
-Retorna o status atual da VM:
-```json
-{
-  "machine_id": "vm_001",
-  "status": "idle",
-  "mode": "TESTE",
-  "connection_status": "disconnected",
-  "error_msg": "",
-  "timestamp": "2025-08-16T04:00:00.000000",
-  "source_config": {...},
-  "trigger_config": {...},
-  "source_available": true
-}
-```
+### **📡 APIs Disponíveis**
+- `GET/PUT /api/status` - Status da VM
+- `POST /api/control` - Controle (start/stop/trigger)
+- `GET/PUT /api/source_config` - Configuração da fonte
+- `GET/PUT /api/trigger_config` - Configuração do trigger
+- `GET/PUT /api/inspection_config` - Configuração das ferramentas
+- `GET /api/error` - Informações de erro
 
-#### **POST /api/control**
-Controla a VM com comandos:
-```json
-{
-  "command": "start_inspection"
-}
-```
+## 🧪 **Testes**
 
-**Comandos disponíveis:**
-- `change_mode`: Altera modo (TESTE/RUN)
-- `start_inspection`: Inicia inspeção
-- `stop_inspection`: Para inspeção
-- `update_inspection_config`: Atualiza configuração
-
-#### **PUT /api/source_config**
-Configura fonte de imagem:
-```json
-{
-  "type": "pasta",
-  "folder_path": "./test_images"
-}
-```
-
-**Tipos de source:**
-- `pasta`: Pasta com imagens (fila cíclica)
-- `camera`: Câmera local por ID
-- `camera_IP`: Stream RTSP
-
-#### **GET/PUT /api/trigger_config**
-Gerencia configuração de trigger:
-```json
-{
-  "type": "continuous",
-  "interval_ms": 1000
-}
-```
-
-#### **GET/POST/DELETE /api/error**
-Gerencia mensagens de erro:
-- `GET`: Obtém informações de erro
-- `POST`: Define mensagem de erro
-- `DELETE`: Limpa erro
-
-## 🔌 WebSocket (SocketIO)
-
-### **Eventos Disponíveis**
-
-#### **Eventos de Cliente → Servidor**
-- `connect`: Conecta ao servidor
-- `disconnect`: Desconecta do servidor
-- `request_status`: Solicita status atual
-
-#### **Eventos de Servidor → Cliente**
-- `connected`: Confirma conexão
-- `status_update`: Atualização de status
-- `test_result`: Resultado de processamento de teste
-
-### **Exemplo de Resultado de Teste**
-```json
-{
-  "aprovados": 5,
-  "reprovados": 1,
-  "frame": 6,
-  "time": "23ms",
-  "tools": {},
-  "timestamp": "2025-08-16T04:00:00.000000",
-  "source_type": "pasta",
-  "mode": "TESTE"
-}
-```
-
-## ⚙️ Configuração
-
-### **Arquivo de Configuração (vm_config.json)**
-```json
-{
-  "machine_id": "vm_001",
-  "django_url": "http://localhost:8000",
-  "status": "idle",
-  "mode": "TESTE",
-  "connection_status": "disconnected",
-  "inspection_config": {},
-  "source_config": {
-    "type": "pasta",
-    "folder_path": "./test_images",
-    "camera_id": 0,
-    "resolution": [640, 480],
-    "fps": 30,
-    "rtsp_url": ""
-  },
-  "trigger_config": {
-    "type": "continuous",
-    "interval_ms": 1000
-  },
-  "error_msg": "",
-  "last_saved": "2025-08-16T04:00:00.000000"
-}
-```
-
-### **Configurações Padrão**
-- **Status inicial**: `idle`
-- **Modo inicial**: `TESTE`
-- **Source padrão**: `pasta` com `./test_images`
-- **Trigger**: `continuous` com 1000ms
-- **Resolução**: 640x480 @ 30fps
-
-## 🧪 Testes
-
-### **Script de Teste Automatizado**
+### **Teste Automatizado**
 ```bash
 python test_vm.py
 ```
 
-**Testes incluídos:**
-- ✅ Endpoints da API
-- ✅ Configuração de source
-- ✅ Controle de modo
-- ✅ Controle de inspeção
-- ✅ WebSocket básico
-- ✅ WebSocket com processamento
-- ✅ Sistema de tratamento de erros
-- ✅ Limpeza e restauração
-
-### **Script de Teste Interativo**
+### **Teste Manual Interativo**
 ```bash
 python test_user_vm.py
 ```
 
-**Comandos disponíveis:**
-- `status`: Mostra status atual
-- `mode <TESTE/RUN>`: Altera modo
-- `start`: Inicia inspeção
-- `stop`: Para inspeção
-- `source_pasta <path>`: Configura source para pasta
-- `source_camera <id>`: Configura source para câmera
-- `source_rtsp <url>`: Configura source para RTSP
-- `error`: Mostra informações de erro
-- `set_error <msg>`: Define mensagem de erro
-- `clear_error`: Limpa erro
+### **Teste das Ferramentas**
+```bash
+python test_tools.py
+```
 
-## 🛡️ Tratamento de Erros
+## ⚙️ **Configuração**
 
-### **Sistema de Recuperação Automática**
-1. **Detecção**: Identifica quando `ImageSource` está quebrado
-2. **Recriação**: Tenta recriar automaticamente
-3. **Fallback**: Se falhar, define status de erro
-4. **Recuperação**: Permite recriar manualmente via API
+### **Exemplo de Pipeline de Ferramentas**
+```json
+{
+  "inspection_config": {
+    "tools": [
+      {
+        "id": 1,
+        "name": "grayscale_filter",
+        "type": "grayscale",
+        "ROI": {"x": 0, "y": 0, "w": 640, "h": 480},
+        "method": "luminance",
+        "normalize": true,
+        "inspec_pass_fail": false
+      },
+      {
+        "id": 2,
+        "name": "blob_1",
+        "type": "blob",
+        "ROI": {"x": 0, "y": 10, "w": 100, "h": 100},
+        "th_max": 255,
+        "th_min": 130,
+        "area_min": 100,
+        "area_max": 1000,
+        "test_total_area_max": 100,
+        "test_total_area_min": 50,
+        "test_blob_count_max": 5,
+        "test_blob_count_min": 4,
+        "total_area_test": true,
+        "blob_count_test": true,
+        "inspec_pass_fail": true
+      }
+    ]
+  }
+}
+```
 
-### **Estados de Erro**
-- **`idle`**: Estado normal, pronto para operação
-- **`running`**: Processando inspeção
-- **`error`**: Erro ativo, inspeção parada
+## 🔍 **Monitoramento**
 
-### **Comportamento em Caso de Erro**
-- ✅ **Não quebra**: Aplicação continua funcionando
-- ✅ **API disponível**: Endpoints continuam respondendo
-- ✅ **Recuperação**: Pode ser resolvido via API
-- ✅ **Logs detalhados**: Informações completas para debug
+### **Logs em Tempo Real**
+```
+ Iniciando inspeção com 2 ferramentas...
+   1️⃣ Processando grayscale_filter (ID: 1)...
+   🔄 Usando imagem grayscale já processada para blob_1
+   2️⃣ Processando blob_1 (ID: 2)...
+   ✅ Pipeline funcionando corretamente
+   📊 Grayscale: 1.23ms
+   📊 Blob: 2.45ms
+   🎯 Sem duplicação de processamento grayscale
+```
 
-## 🔄 Persistência Automática
+### **Métricas de Performance**
+- Tempo individual de cada ferramenta
+- Tempo total da inspeção
+- Overhead de processamento
+- Cache hit/miss rates
 
-### **Fluxo de Configuração**
-1. **Inicialização**: Carrega de `vm_config.json` se existir
-2. **Padrões**: Usa configurações padrão se arquivo não existir
-3. **Salvamento**: Salva automaticamente em todas as mudanças
-4. **Recuperação**: Carrega estado salvo na próxima inicialização
+## 🛠️ **Desenvolvimento**
 
-### **Auto-Start de Inspeção**
-- **Verificação**: Checa se deve iniciar automaticamente
-- **Pré-requisitos**: Valida source e modo antes de iniciar
-- **Recriação**: Tenta recriar source se necessário
-- **Fallback**: Volta para `idle` se não puder iniciar
-
-## 📁 Estrutura de Arquivos
-
+### **Estrutura do Projeto**
 ```
 vision_machine/
-├── vm.py                          # Servidor principal
-├── vm_config.json                 # Configuração persistente
-├── vm_example_config.json         # Exemplo de configuração
-├── test_vm.py                     # Testes automatizados
-├── test_user_vm.py                # Teste interativo
-├── requirements.txt                # Dependências Python
-├── README.md                      # Esta documentação
-├── diagrama_classes_vm.puml       # Diagrama de classes
-├── source_config_examples.md      # Exemplos de configuração
-└── test_images/                   # Pasta de imagens de teste
-    ├── image1.bmp
-    ├── image2.bmp
-    └── ...
+├── tools/                    # Sistema de ferramentas
+│   ├── __init__.py
+│   ├── base_tool.py         # Classe base abstrata
+│   ├── grayscale_tool.py    # Ferramenta grayscale
+│   ├── blob_tool.py         # Ferramenta blob
+│   └── math_tool.py         # Ferramenta matemática
+├── inspection_processor.py   # Processador principal
+├── vm.py                    # VM principal
+├── vm_config.json           # Configuração
+└── test_*.py                # Scripts de teste
 ```
 
-## 🚀 Casos de Uso
+### **Adicionando Novas Ferramentas**
+1. Herde de `BaseTool`
+2. Implemente o método `process()`
+3. Adicione validação em `validate_config()`
+4. Registre no `InspectionProcessor`
 
-### **Desenvolvimento e Teste**
-1. **Configurar source para pasta** com imagens de teste
-2. **Executar modo TESTE** para validação
-3. **Monitorar via WebSocket** em tempo real
-4. **Testar APIs** para validação de funcionalidades
+## 🚧 **Limitações Atuais**
 
-### **Produção**
-1. **Configurar source real** (câmera ou RTSP)
-2. **Alterar para modo RUN** quando implementar lógica real
-3. **Configurar trigger** conforme necessidade
-4. **Monitorar via API** de status
+- ROI apenas retangular
+- Validação básica de configuração
+- Tratamento de erro via exceções
+- Processamento sequencial (não paralelo)
 
-### **Integração com Orquestrador**
-1. **Configurar django_url** para comunicação
-2. **Implementar webhooks** para notificações
-3. **Sincronizar status** via API REST
-4. **Monitorar conexão** via WebSocket
+## 🔮 **Roadmap**
 
-## 🔧 Troubleshooting
+### **Próximas Ferramentas**
+- Edge Detection
+- Color Analysis
+- Pattern Matching
+- OCR
 
-### **Problemas Comuns**
+### **Melhorias Técnicas**
+- Paralelização de ferramentas independentes
+- GPU acceleration
+- Machine learning integration
+- Plugin system
 
-#### **Source de Imagem Não Disponível**
-- **Sintoma**: Erro 400 ao iniciar inspeção
-- **Solução**: Verificar se pasta existe e tem imagens
-- **Prevenção**: Sistema tenta recriar automaticamente
+## 📞 **Suporte**
 
-#### **WebSocket Não Conecta**
-- **Sintoma**: Timeout na conexão
-- **Solução**: Verificar se servidor está rodando na porta correta
-- **Prevenção**: Usar `namespaces=['/']` no cliente
-
-#### **Inspeção Não Inicia**
-- **Sintoma**: Status permanece `idle`
-- **Solução**: Verificar se source está configurado corretamente
-- **Prevenção**: Sistema valida source antes de iniciar
-
-### **Logs e Debug**
-- **Nível**: INFO por padrão
-- **Formato**: Timestamp + Nome + Nível + Mensagem
-- **Arquivo**: Console (configurável)
-- **Emojis**: Usados para facilitar leitura
-
-## 📈 Roadmap
-
-### **Funcionalidades Futuras**
-- [ ] **Lógica real de inspeção**: Substituir simulação
-- [ ] **Múltiplas câmeras**: Suporte a arrays de câmeras
-- [ ] **Calibração automática**: Sistema de calibração
-- [ ] **Machine Learning**: Integração com modelos ML
-- [ ] **Dashboard web**: Interface gráfica para monitoramento
-- [ ] **Métricas avançadas**: Estatísticas de performance
-- [ ] **Backup automático**: Sistema de backup de configurações
-- [ ] **Health checks**: Verificações de saúde do sistema
-
-## 🤝 Contribuição
-
-### **Padrões de Código**
-- **Python 3.8+**: Compatibilidade com versões modernas
-- **Type hints**: Uso de tipos para melhor documentação
-- **Docstrings**: Documentação inline de métodos
-- **Logging estruturado**: Logs informativos e organizados
-- **Tratamento de erros**: Try-catch robusto em operações críticas
-
-### **Estrutura de Commits**
-- **feat**: Nova funcionalidade
-- **fix**: Correção de bug
-- **docs**: Documentação
-- **test**: Testes
-- **refactor**: Refatoração de código
-- **style**: Formatação de código
-
-## 📄 Licença
-
-Este projeto faz parte do sistema **AnalyticLens** e está sob os termos da licença do projeto principal.
-
-## 📞 Suporte
-
-Para dúvidas, sugestões ou problemas:
-1. **Verificar logs** para informações detalhadas
-2. **Executar testes** para validar funcionalidades
-3. **Consultar documentação** para casos de uso
-4. **Abrir issue** no repositório do projeto
+Para dúvidas ou problemas:
+1. Verifique os logs da VM
+2. Execute os scripts de teste
+3. Consulte a documentação
+4. Valide a configuração JSON
 
 ---
 
-**AnalyticLens Vision Machine** - Sistema robusto e inteligente para visão computacional 🚀
+## 📊 **Status do Projeto**
+
+- ✅ **Sistema de Ferramentas**: Implementado e testado
+- ✅ **Trigger Config**: Modo contínuo e trigger
+- ✅ **WebSocket**: Resultados em tempo real
+- ✅ **API REST**: Controle completo
+- ✅ **Cache de Imagens**: Otimização de pipeline
+- ✅ **Medição de Tempo**: Performance monitoring
+- 🔄 **Testes**: Cobertura completa
+- 📚 **Documentação**: Atualizada
+
+**🎯 Vision Machine v2.0 - Sistema de Ferramentas Completo**
