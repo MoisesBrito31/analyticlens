@@ -1,52 +1,52 @@
 {
   "machine_id": "vm_001",
   "django_url": "http://localhost:8000",
-  "status": "idle",
+  "status": "running",
   "mode": "TESTE",
   "connection_status": "disconnected",
   "inspection_config": {
     "tools": [
       {
-        "id": 1,
-        "name": "grayscale_filter",
-        "type": "grayscale",
         "ROI": {
-          "x": 0,
-          "y": 0,
+          "h": 480,
           "w": 752,
-          "h": 480
+          "x": 0,
+          "y": 0
         },
+        "id": 1,
+        "inspec_pass_fail": true,
         "method": "luminance",
-        "normalize": true,
-        "inspec_pass_fail": false
+        "name": "grayscale_filter",
+        "normalize": false,
+        "type": "grayscale"
       },
       {
-        "id": 2,
-        "name": "blob_1",
-        "type": "blob",
         "ROI": {
+          "h": 300,
+          "w": 300,
           "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
+          "y": 10
         },
-        "th_max": 255,
-        "th_min": 130,
+        "area_max": 1000,
         "area_min": 100,
-        "area_max": 10000,
-        "test_total_area_max": 100,
-        "test_total_area_min": 50,
+        "blob_count_test": true,
+        "id": 2,
+        "inspec_pass_fail": true,
+        "name": "blob_1",
         "test_blob_count_max": 5,
         "test_blob_count_min": 4,
+        "test_total_area_max": 100,
+        "test_total_area_min": 50,
+        "th_max": 255,
+        "th_min": 130,
         "total_area_test": true,
-        "blob_count_test": true,
-        "inspec_pass_fail": true
+        "type": "blob"
       }
     ]
   },
   "source_config": {
     "type": "pasta",
-    "camera_id": 999,
+    "camera_id": 0,
     "resolution": [
       752,
       480
@@ -60,5 +60,5 @@
     "interval_ms": 1000
   },
   "error_msg": "",
-  "last_saved": "2025-08-17T05:26:51.063391"
+  "last_saved": "2025-08-17T21:47:02.533608"
 }

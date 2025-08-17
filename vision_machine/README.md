@@ -1,5 +1,7 @@
 # 🎯 Vision Machine (VM) - Sistema de Visão Computacional
 
+> 📖 **Projeto Principal**: [analyticLens - README Geral](../../README.md)
+
 ## 📋 **Visão Geral**
 
 A Vision Machine é um servidor Flask robusto para visão computacional que se comunica via REST API e WebSocket. O sistema oferece processamento de imagens em tempo real com configuração flexível de fontes de imagem e modos de operação.

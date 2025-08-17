@@ -765,6 +765,136 @@ class VisionMachine:
         self.save_config()
         logger.info("Configuração de inspeção atualizada e salva")
 
+    def update_tool_config(self, tool_config: Dict[str, Any]):
+        """Atualiza configuração de uma tool específica ou adiciona nova tool"""
+        try:
+            # Verificar se tool_config tem os campos obrigatórios
+            if 'id' not in tool_config or 'name' not in tool_config:
+                raise ValueError("Tool deve ter 'id' e 'name' obrigatórios")
+            
+            tool_id = tool_config['id']
+            tool_name = tool_config['name']
+            
+            # Inicializar lista de tools se não existir
+            if 'tools' not in self.inspection_config:
+                self.inspection_config['tools'] = []
+            
+            tools = self.inspection_config['tools']
+            
+            # Procurar por tool existente com mesmo id e name
+            existing_tool_index = None
+            for i, tool in enumerate(tools):
+                if tool.get('id') == tool_id and tool.get('name') == tool_name:
+                    existing_tool_index = i
+                    break
+            
+            if existing_tool_index is not None:
+                # Atualizar tool existente
+                logger.info(f"🔄 Atualizando tool existente: {tool_name} (ID: {tool_id})")
+                tools[existing_tool_index] = tool_config
+                logger.info(f"✅ Tool {tool_name} atualizada com sucesso")
+            else:
+                # Gerar novo ID único para nova tool
+                if tool_id in [t.get('id') for t in tools]:
+                    new_id = max([t.get('id', 0) for t in tools], default=0) + 1
+                    tool_config['id'] = new_id
+                    logger.info(f"🆔 Novo ID gerado para tool {tool_name}: {new_id}")
+                
+                # Adicionar nova tool ao final da fila
+                logger.info(f"➕ Adicionando nova tool: {tool_name} (ID: {tool_config['id']})")
+                tools.append(tool_config)
+                logger.info(f"✅ Nova tool {tool_name} adicionada com sucesso")
+            
+            # Recriar inspection_processor com nova configuração
+            if TOOLS_AVAILABLE:
+                try:
+                    self.inspection_processor = InspectionProcessor(self.inspection_config)
+                    logger.info(f"✅ Processador de ferramentas recriado com {len(self.inspection_processor.tools)} ferramentas")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao recriar processador de ferramentas: {str(e)}")
+                    self.inspection_processor = None
+            else:
+                logger.info("ℹ️ Sistema de ferramentas não disponível")
+                self.inspection_processor = None
+            
+            # Sempre salvar após atualização
+            self.save_config()
+            logger.info(f"Configuração de tool {tool_name} atualizada e salva")
+            
+            return {
+                'success': True,
+                'tool_id': tool_config['id'],
+                'tool_name': tool_name,
+                'action': 'updated' if existing_tool_index is not None else 'added',
+                'total_tools': len(tools)
+            }
+            
+        except Exception as e:
+            error_message = f"Erro ao atualizar configuração de tool: {str(e)}"
+            logger.error(f"❌ {error_message}")
+            raise Exception(error_message)
+
+    def delete_tool(self, tool_id: int):
+        """Remove uma tool específica pelo ID"""
+        try:
+            # Verificar se há lista de tools
+            if 'tools' not in self.inspection_config or not self.inspection_config['tools']:
+                raise ValueError("Nenhuma tool configurada para remover")
+            
+            tools = self.inspection_config['tools']
+            
+            # Procurar por tool com o ID especificado
+            tool_index = None
+            tool_name = None
+            
+            for i, tool in enumerate(tools):
+                if tool.get('id') == tool_id:
+                    tool_index = i
+                    tool_name = tool.get('name', f'Tool_{tool_id}')
+                    break
+            
+            if tool_index is None:
+                raise ValueError(f"Tool com ID {tool_id} não encontrada")
+            
+            # Remover tool da lista
+            removed_tool = tools.pop(tool_index)
+            tool_name = removed_tool.get('name', f'Tool_{tool_id}')
+            
+            logger.info(f"🗑️ Tool removida: {tool_name} (ID: {tool_id})")
+            
+            # Recriar inspection_processor com nova configuração
+            if TOOLS_AVAILABLE and tools:  # Só recriar se ainda houver tools
+                try:
+                    self.inspection_processor = InspectionProcessor(self.inspection_config)
+                    logger.info(f"✅ Processador de ferramentas recriado com {len(self.inspection_processor.tools)} ferramentas")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao recriar processador de ferramentas: {str(e)}")
+                    self.inspection_processor = None
+            elif not tools:
+                # Se não há mais tools, limpar o processador
+                logger.info("ℹ️ Nenhuma tool restante, limpando processador de ferramentas")
+                self.inspection_processor = None
+            else:
+                logger.info("ℹ️ Sistema de ferramentas não disponível")
+                self.inspection_processor = None
+            
+            # Sempre salvar após remoção
+            self.save_config()
+            logger.info(f"Tool {tool_name} removida e configuração salva")
+            
+            return {
+                'success': True,
+                'tool_id': tool_id,
+                'tool_name': tool_name,
+                'action': 'deleted',
+                'total_tools': len(tools)
+            }
+            
+        except Exception as e:
+            error_message = f"Erro ao remover tool com ID {tool_id}: {str(e)}"
+            logger.error(f"❌ {error_message}")
+            raise Exception(error_message)
+
     def change_mode(self, new_mode: str):
         """Muda o modo de operação e salva"""
         if new_mode in ['TESTE', 'RUN']:
@@ -1062,6 +1192,53 @@ class FlaskVisionServer:
                     self.test_processor.request_trigger()
                     logger.info("✅ Trigger solicitado com sucesso")
                     return jsonify({"success": True, "message": "Trigger solicitado"})
+                
+                elif command == 'config_tool':
+                    logger.info("🔧 Comando config_tool recebido")
+                    
+                    # Verificar se params contém configuração da tool
+                    if not params:
+                        error_msg = "Parâmetros de configuração da tool não fornecidos"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 400
+                    
+                    try:
+                        # Atualizar configuração da tool
+                        result = self.vm.update_tool_config(params)
+                        logger.info(f"✅ Tool configurada com sucesso: {result}")
+                        return jsonify(result)
+                    except Exception as tool_error:
+                        error_msg = f"Erro ao configurar tool: {str(tool_error)}"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 500
+                
+                elif command == 'delete_tool':
+                    logger.info("🗑️ Comando delete_tool recebido")
+                    
+                    # Verificar se params contém o ID da tool
+                    tool_id = params.get('id')
+                    if tool_id is None:
+                        error_msg = "ID da tool não fornecido no parâmetro 'id'"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 400
+                    
+                    try:
+                        # Converter para inteiro
+                        tool_id = int(tool_id)
+                    except (ValueError, TypeError):
+                        error_msg = f"ID da tool deve ser um número inteiro, recebido: {tool_id}"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 400
+                    
+                    try:
+                        # Remover tool
+                        result = self.vm.delete_tool(tool_id)
+                        logger.info(f"✅ Tool removida com sucesso: {result}")
+                        return jsonify(result)
+                    except Exception as tool_error:
+                        error_msg = f"Erro ao remover tool: {str(tool_error)}"
+                        logger.warning(f"⚠️ {error_msg}")
+                        return jsonify({"success": False, "error": error_msg}), 500
                 
                 else:
                     return jsonify({"success": False, "error": "Comando não reconhecido"}), 400

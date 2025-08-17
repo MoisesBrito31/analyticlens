@@ -61,6 +61,20 @@ package "Frontend (Vue.js)" {
       + position: Object
       + selectNode()
     }
+    
+    class LiveView {
+      + currentImage: Object
+      + inspectionStatus: String
+      + startInspection()
+      + stopInspection()
+    }
+    
+    class ImageLogView {
+      + imageHistory: Array
+      + selectedImage: Object
+      + viewImage()
+      + downloadImage()
+    }
   }
   
   package "Stores (Pinia)" {
@@ -295,20 +309,44 @@ package "Backend (Django - Orquestrador)" {
   }
 }
 
-package "Máquinas de Visão (Flask)" {
-  package "API Endpoints" {
-    class FlaskApp {
-      + app: Flask
-      + run()
-      + register_blueprints()
+package "Vision Machine (Flask)" {
+  package "Core Server" {
+    class VisionMachine {
+      + machine_id: String
+      + django_url: String
+      + inspection_config: Dict
+      + inspection_processor: InspectionProcessor
+      + source_config: Dict
+      + trigger_config: Dict
+      + update_tool_config(tool_config)
+      + delete_tool(tool_id)
+      + save_config()
+      + load_config()
     }
     
-    class MachineAPI {
-      + /heartbeat
-      + /status
-      + /receive_inspection
-      + /send_results
-      + /update_config
+    class FlaskApp {
+      + app: Flask
+      + vm: VisionMachine
+      + run()
+      + register_routes()
+    }
+  }
+  
+  package "API Endpoints" {
+    class ControlAPI {
+      + /api/control
+      + handle_config_tool()
+      + handle_delete_tool()
+      + handle_trigger_trigger()
+      + handle_get_status()
+    }
+    
+    class ConfigAPI {
+      + /api/inspection_config
+      + /api/source_config
+      + /api/trigger_config
+      + get_config()
+      + update_config()
     }
     
     class WebhookHandler {
@@ -336,11 +374,13 @@ package "Máquinas de Visão (Flask)" {
   }
   
   package "Inspection Engine" {
-    class InspectionExecutor {
-      + execute_inspection()
-      + load_pipeline_config()
-      + run_tools()
-      + collect_results()
+    class InspectionProcessor {
+      + tools: Array
+      + image_cache: Dict
+      + process_image(image_path)
+      + execute_tools(image)
+      + get_tool_results()
+      + clear_cache()
     }
     
     class ToolRegistry {
@@ -355,6 +395,42 @@ package "Máquinas de Visão (Flask)" {
       + preprocess()
       + postprocess()
       + save_result()
+    }
+  }
+  
+  package "Tools System" {
+    class BaseTool {
+      <<abstract>>
+      + id: Integer
+      + name: String
+      + type: String
+      + roi: Dict
+      + inspec_pass_fail: Boolean
+      + reference_tool_id: Integer
+      + process(image)
+      + validate_parameters()
+    }
+    
+    class GrayscaleTool {
+      + method: String
+      + normalize: Boolean
+      + process(image)
+    }
+    
+    class BlobTool {
+      + th_min: Integer
+      + th_max: Integer
+      + area_min: Integer
+      + area_max: Integer
+      + test_area: Boolean
+      + test_count: Boolean
+      + process(image)
+    }
+    
+    class MathTool {
+      + operation: String
+      + custom_formula: String
+      + process(image)
     }
   }
   
@@ -374,6 +450,19 @@ package "Máquinas de Visão (Flask)" {
       + send_heartbeat()
     }
   }
+  
+  package "Testing" {
+    class ToolsTestManager {
+      + original_config: Dict
+      + create_backup()
+      + restore_backup()
+      + test_processor_functionality()
+      + test_config_tool()
+      + test_delete_tool()
+      + test_error_handling()
+      + run_all_tests()
+    }
+  }
 }
 
 ' ========================================
@@ -384,6 +473,8 @@ package "Máquinas de Visão (Flask)" {
 App ||--o{ DashboardView : contains
 App ||--o{ MachineManagementView : contains
 App ||--o{ InspectionEditView : contains
+App ||--o{ LiveView : contains
+App ||--o{ ImageLogView : contains
 InspectionEditView ||--o{ ToolsCanvas : contains
 ToolsCanvas ||--o{ ToolNode : contains
 ToolsCanvas ||--o{ ToolProperties : contains
@@ -415,25 +506,52 @@ MachineManager ||--o{ InspectionMachine : manages
 TaskDistributor ||--o{ DistributedInspection : distributes
 SecurityManager ||--o{ InspectionMachine : authenticates
 
-' Flask Machine Relationships
-FlaskApp ||--o{ MachineAPI : provides
-MachineAPI ||--o{ WebhookHandler : uses
+' Vision Machine Core Relationships
+FlaskApp ||--o{ VisionMachine : contains
+VisionMachine ||--o{ InspectionProcessor : uses
+VisionMachine ||--o{ ToolRegistry : uses
+
+' API Relationships
+ControlAPI ||--o{ VisionMachine : controls
+ConfigAPI ||--o{ VisionMachine : configures
+FlaskApp ||--o{ ControlAPI : provides
+FlaskApp ||--o{ ConfigAPI : provides
+
+' Tools System Relationships
+InspectionProcessor ||--o{ BaseTool : processes
+BaseTool ||--o{ GrayscaleTool : extends
+BaseTool ||--o{ BlobTool : extends
+BaseTool ||--o{ MathTool : extends
+ToolRegistry ||--o{ BaseTool : manages
+
+' Security Relationships
 FlaskApp ||--o{ AuthenticationMiddleware : uses
 AuthenticationMiddleware ||--o{ SecurityConfig : validates
-InspectionExecutor ||--o{ ToolRegistry : uses
-InspectionExecutor ||--o{ ImageProcessor : uses
+
+' Communication Relationships
 FlaskApp ||--o{ HeartbeatService : runs
 HeartbeatService ||--o{ DjangoCommunicator : uses
 
+' Testing Relationships
+ToolsTestManager ||--o{ VisionMachine : tests
+
 ' Cross-system Relationships
-MachineViewSet ||--o{ MachineAPI : communicates
-InspectionViewSet ||--o{ MachineAPI : communicates
+MachineViewSet ||--o{ ControlAPI : communicates
+InspectionViewSet ||--o{ ControlAPI : communicates
 WebhookReceiverView ||--o{ WebhookHandler : receives
-TaskDistributor ||--o{ InspectionExecutor : distributes
+TaskDistributor ||--o{ InspectionProcessor : distributes
 
 ' ========================================
 ' NOTES
 ' ========================================
+note top of VisionMachine : "Servidor principal da Vision Machine com gerenciamento de tools dinâmico"
+note top of InspectionProcessor : "Processa imagens usando pipeline de tools configurado"
+note top of BaseTool : "Classe base para todas as ferramentas de visão computacional"
+note top of GrayscaleTool : "Converte imagens para escala de cinza com múltiplos métodos"
+note top of BlobTool : "Detecta e analisa objetos em imagens com testes configuráveis"
+note top of MathTool : "Executa operações matemáticas sobre resultados de outras tools"
+note top of ControlAPI : "API para controle dinâmico: config_tool, delete_tool, trigger_trigger"
+note top of ToolsTestManager : "Sistema de testes automatizados com backup/restauração"
 note top of InspectionMachine : "Representa uma máquina de visão na rede com autenticação e monitoramento"
 note top of MachineManager : "Gerencia o ciclo de vida das máquinas de inspeção"
 note top of TaskDistributor : "Distribui inspeções para máquinas disponíveis baseado em capacidade e carga"
