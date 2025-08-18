@@ -1,4 +1,4 @@
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Gradientes simples e elegantes -->
   <defs>
     <!-- Fundo principal - azul claro -->
@@ -27,57 +27,57 @@
   </defs>
   
   <!-- Fundo principal - quadrado arredondado -->
-  <rect x="2" y="2" width="36" height="36" rx="8" fill="url(#mainGradient)" stroke="url(#borderGradient)" stroke-width="1.5"/>
+  <rect x="1.5" y="1.5" width="29" height="29" rx="6" fill="url(#mainGradient)" stroke="url(#borderGradient)" stroke-width="1"/>
   
   <!-- Lupa principal - CENTRO (mais bonita com cabo no canto inferior direito, girada 45° no sentido horário) -->
-  <g transform="translate(20, 20) rotate(45)">
+  <g transform="translate(16, 16) rotate(45)">
     <!-- Lente da lupa -->
-    <circle cx="0" cy="0" r="8" fill="url(#magnifierGradient)" stroke="url(#elementGradient)" stroke-width="2"/>
+    <circle cx="0" cy="0" r="6" fill="url(#magnifierGradient)" stroke="url(#elementGradient)" stroke-width="1.2"/>
     <!-- Interior da lente -->
-    <circle cx="0" cy="0" r="6" fill="url(#mainGradient)"/>
+    <circle cx="0" cy="0" r="4.5" fill="url(#mainGradient)"/>
     <!-- Cabo da lupa no canto inferior direito -->
-    <rect x="8" y="0" width="8" height="3" rx="1.5" fill="url(#elementGradient)" opacity="0.9"/>
+    <rect x="6" y="0" width="6" height="2" rx="1" fill="url(#elementGradient)" opacity="0.9"/>
     <!-- Ponta do cabo -->
-    <path d="M 16 1.5 L 20 0 L 20 3 Z" fill="url(#elementGradient)" opacity="0.9"/>
+    <path d="M 12 1 L 15 0 L 15 2 Z" fill="url(#elementGradient)" opacity="0.9"/>
   </g>
   
   <!-- Triângulo - CANTO SUPERIOR ESQUERDO (triângulo equilátero maior, apontando para cima, mais próximo do canto) -->
-  <path d="M 6 10 L 14 10 L 10 4 Z" fill="url(#elementGradient)" opacity="0.9"/>
+  <path d="M 6 9 L 12 9 L 9 3 Z" fill="url(#elementGradient)" opacity="0.9"/>
   
   <!-- Engrenagem - CANTO SUPERIOR DIREITO (8 dentes distribuídos uniformemente) -->
-  <g transform="translate(30, 8)">
+  <g transform="translate(24, 6)">
     <!-- Círculo azul escuro da engrenagem -->
-    <circle cx="0" cy="0" r="3" fill="url(#elementGradient)" opacity="0.9"/>
+    <circle cx="0" cy="0" r="2.5" fill="url(#elementGradient)" opacity="0.9"/>
     
     <!-- 8 dentes da engrenagem distribuídos uniformemente -->
     <!-- Norte -->
-    <rect x="-0.6" y="-4" width="1.2" height="8" fill="url(#elementGradient)" opacity="0.9"/>
+    <rect x="-0.5" y="-3.5" width="1" height="7" fill="url(#elementGradient)" opacity="0.9"/>
     <!-- Nordeste -->
-    <rect x="-0.6" y="-4" width="1.2" height="8" fill="url(#elementGradient)" opacity="0.9" transform="rotate(45 0 0)"/>
+    <rect x="-0.5" y="-3.5" width="1" height="7" fill="url(#elementGradient)" opacity="0.9" transform="rotate(45 0 0)"/>
     <!-- Leste -->
-    <rect x="-4" y="-0.6" width="8" height="1.2" fill="url(#elementGradient)" opacity="0.9"/>
+    <rect x="-3.5" y="-0.5" width="7" height="1" fill="url(#elementGradient)" opacity="0.9"/>
     <!-- Sudeste -->
-    <rect x="-0.6" y="-4" width="1.2" height="8" fill="url(#elementGradient)" opacity="0.9" transform="rotate(135 0 0)"/>
+    <rect x="-0.5" y="-3.5" width="1" height="7" fill="url(#elementGradient)" opacity="0.9" transform="rotate(135 0 0)"/>
     <!-- Sul -->
-    <rect x="-0.6" y="-4" width="1.2" height="8" fill="url(#elementGradient)" opacity="0.9" transform="rotate(180 0 0)"/>
+    <rect x="-0.5" y="-3.5" width="1" height="7" fill="url(#elementGradient)" opacity="0.9" transform="rotate(180 0 0)"/>
     <!-- Sudoeste -->
-    <rect x="-0.6" y="-4" width="1.2" height="8" fill="url(#elementGradient)" opacity="0.9" transform="rotate(225 0 0)"/>
+    <rect x="-0.5" y="-3.5" width="1" height="7" fill="url(#elementGradient)" opacity="0.9" transform="rotate(225 0 0)"/>
     <!-- Oeste -->
-    <rect x="-4" y="-0.6" width="8" height="1.2" fill="url(#elementGradient)" opacity="0.9" transform="rotate(180 0 0)"/>
+    <rect x="-3.5" y="-0.5" width="7" height="1" fill="url(#elementGradient)" opacity="0.9" transform="rotate(180 0 0)"/>
     <!-- Noroeste -->
-    <rect x="-0.6" y="-4" width="1.2" height="8" fill="url(#elementGradient)" opacity="0.9" transform="rotate(315 0 0)"/>
+    <rect x="-0.5" y="-3.5" width="1" height="7" fill="url(#elementGradient)" opacity="0.9" transform="rotate(315 0 0)"/>
     
     <!-- Círculo branco pequeno no centro -->
-    <circle cx="0" cy="0" r="1.5" fill="url(#magnifierGradient)" opacity="0.9"/>
+    <circle cx="0" cy="0" r="1.2" fill="url(#magnifierGradient)" opacity="0.9"/>
   </g>
   
   <!-- Câmera - CANTO INFERIOR ESQUERDO (mais próxima do canto) -->
-  <g transform="translate(10, 30)">
+  <g transform="translate(9, 24)">
     <!-- Corpo da câmera -->
-    <rect x="-3" y="-2.5" width="6" height="5" rx="1" fill="url(#elementGradient)" opacity="0.9"/>
+    <rect x="-2.5" y="-2" width="5" height="4" rx="1" fill="url(#elementGradient)" opacity="0.9"/>
     <!-- Lente da câmera -->
-    <circle cx="0" cy="0" r="1.5" fill="url(#mainGradient)" stroke="url(#elementGradient)" stroke-width="0.5"/>
+    <circle cx="0" cy="0" r="1.2" fill="url(#mainGradient)" stroke="url(#elementGradient)" stroke-width="0.3"/>
     <!-- Interior da lente -->
-    <circle cx="0" cy="0" r="1" fill="url(#elementGradient)" opacity="0.7"/>
+    <circle cx="0" cy="0" r="0.8" fill="url(#elementGradient)" opacity="0.7"/>
   </g>
 </svg>

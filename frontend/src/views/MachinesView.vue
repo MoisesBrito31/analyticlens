@@ -5,31 +5,31 @@
       <BRow>
         <BCol cols="12">
           <BCard class="shadow-sm border-0">
-            <BCardHeader class="bg-success text-white">
+            <BCardHeader class="bg-info text-white">
               <div class="d-flex align-items-center">
-                <i class="bi bi-clipboard-check me-3 fs-2"></i>
+                <i class="bi bi-cpu me-3 fs-2"></i>
                 <div>
-                  <h2 class="mb-0">Sistema de Inspeções</h2>
-                  <p class="mb-0 opacity-75">Gerencie e monitore suas inspeções de visão computacional</p>
+                  <h2 class="mb-0">Lista de Máquinas de Visão (VM)</h2>
+                  <p class="mb-0 opacity-75">Gerencie suas máquinas de visão conectadas</p>
                 </div>
               </div>
             </BCardHeader>
             <BCardBody class="p-4 p-md-5">
               <BRow>
                 <BCol cols="12">
-                  <BAlert variant="success" show class="mb-4">
+                  <BAlert variant="info" show class="mb-4">
                     <i class="bi bi-info-circle me-2"></i>
-                    <strong>Status:</strong> Sistema de inspeções em desenvolvimento.
-                    Aqui você poderá visualizar, configurar e monitorar todas as inspeções do sistema.
+                    <strong>Status:</strong> Sistema de máquinas de visão em desenvolvimento.
+                    Aqui você poderá visualizar e gerenciar todas as máquinas conectadas ao sistema.
                   </BAlert>
                   
                   <BCard class="border-0 bg-light">
                     <BCardBody class="text-center py-4 py-md-5">
-                      <i class="bi bi-clipboard-check text-muted mb-3" style="font-size: 4rem; opacity: 0.5;"></i>
+                      <i class="bi bi-cpu text-muted mb-3" style="font-size: 4rem; opacity: 0.5;"></i>
                       <h5 class="text-muted">Funcionalidade em Desenvolvimento</h5>
                       <p class="text-muted mb-0">
-                        A funcionalidade de gerenciamento de inspeções será implementada em breve.
-                        Incluirá monitoramento em tempo real, histórico de resultados e configurações avançadas.
+                        A funcionalidade de listagem e gerenciamento de máquinas de visão 
+                        será implementada em breve.
                       </p>
                     </BCardBody>
                   </BCard>
@@ -44,7 +44,7 @@
                       <i class="bi bi-clock me-1"></i>
                       Última verificação: {{ new Date().toLocaleString('pt-BR') }}
                     </small>
-                    <BButton variant="outline-success" size="sm">
+                    <BButton variant="outline-primary" size="sm">
                       <i class="bi bi-arrow-clockwise me-1"></i>
                       Atualizar
                     </BButton>
@@ -75,7 +75,7 @@ import {
 
 <style scoped>
 .card-header {
-  background: linear-gradient(135deg, #198754 0%, #20c997 100%) !important;
+  background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%) !important;
 }
 
 .opacity-75 {

@@ -20,7 +20,7 @@ from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('api.urls')),
+    path('api/', include('api.urls')),  # Reativado para incluir a página inicial
     path('api/auth/', include('user.urls')),
     # Fallback SPA para rotas do Vue Router (quando o build estiver servido pelo Django)
     re_path(r'^(?!api/|admin/|static/|media/).*$', TemplateView.as_view(template_name='index.html')),

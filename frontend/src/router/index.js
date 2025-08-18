@@ -1,11 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LoginView from '../views/LoginView.vue'
-import LiveView from '../views/LiveView.vue'
-import InspectionsView from '../views/InspectionsView.vue'
-import ImageLogView from '../views/ImageLogView.vue'
-import ConfigurationsView from '../views/ConfigurationsView.vue'
-import InspectionEditView from '../views/InspectionEditView.vue'
 import { useAuthStore } from '@/stores/auth'
+import HomeView from '@/views/HomeView.vue'
+import LoginView from '@/views/LoginView.vue'
+import MachinesView from '@/views/MachinesView.vue'
+import InspectionsView from '@/views/InspectionsView.vue'
+import ConfigurationsView from '@/views/ConfigurationsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -13,66 +12,42 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: LiveView, // Redireciona para ao vivo por padrão
-      meta: { requiresAuth: true },
+      component: HomeView,
+      meta: { requiresAuth: true }
     },
     {
-      path: '/live',
-      name: 'live',
-      component: LiveView,
-      meta: { requiresAuth: true },
+      path: '/login',
+      name: 'login',
+      component: LoginView
+    },
+    {
+      path: '/machines',
+      name: 'machines',
+      component: MachinesView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/inspections',
       name: 'inspections',
       component: InspectionsView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/image-log',
-      name: 'image-log',
-      component: ImageLogView,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true }
     },
     {
       path: '/configurations',
       name: 'configurations',
       component: ConfigurationsView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/inspection/edit',
-      name: 'inspection-create',
-      component: InspectionEditView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/inspection/edit/:id',
-      name: 'inspection-edit',
-      component: InspectionEditView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/about',
-      name: 'about',
-      component: () => import('../views/AboutView.vue'),
-      meta: { requiresAuth: true },
-    },
-    { 
-      path: '/login', 
-      name: 'login', 
-      component: LoginView 
-    },
-  ],
+      meta: { requiresAuth: true }
+    }
+  ]
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach((to, from, next) => {
   const auth = useAuthStore()
-  if (!auth.user) {
-    await auth.loadMe()
-  }
+  
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { path: '/login', query: { redirect: to.fullPath } }
+    next('/login')
+  } else {
+    next()
   }
 })
 
