@@ -12,7 +12,7 @@
           <BFormGroup label="Usuário" label-for="username" class="mb-3">
             <BInputGroup>
               <BInputGroupText>
-                <i class="bi bi-person"></i>
+                <Icon name="person" size="1.2em" />
               </BInputGroupText>
               <BFormInput
                 id="username"
@@ -28,7 +28,7 @@
           <BFormGroup label="Senha" label-for="password" class="mb-4">
             <BInputGroup>
               <BInputGroupText>
-                <i class="bi bi-lock"></i>
+                <Icon name="lock" size="1.2em" />
               </BInputGroupText>
               <BFormInput
                 id="password"
@@ -49,7 +49,7 @@
             :disabled="loading"
           >
             <BSpinner v-if="loading" small class="me-2" />
-            <i v-else class="bi bi-box-arrow-in-right me-2"></i>
+            <Icon v-else name="box-arrow-in-right" size="1.2em" class="me-2" />
             {{ loading ? 'Entrando...' : 'Entrar' }}
           </BButton>
         </BForm>
@@ -60,7 +60,7 @@
           class="mt-3"
           show
         >
-          <i class="bi bi-exclamation-triangle me-2"></i>
+          <Icon name="exclamation-triangle" size="1.2em" class="me-2" />
           {{ error }}
         </BAlert>
       </BCard>
@@ -72,6 +72,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import Icon from '@/components/Icon.vue'
 import {
   BCard,
   BForm,

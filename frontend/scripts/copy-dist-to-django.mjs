@@ -153,6 +153,21 @@ for (const imageName of requiredImages) {
   }
 }
 
+// GARANTIA: Copiar todos os ícones SVG usados dinamicamente (src/assets/icons -> static/img/icons)
+try {
+  const srcIconsDir = resolve(srcAssetsDir, 'icons')
+  const destIconsDir = resolve(djangoStatic, 'img', 'icons')
+  if (existsSync(srcIconsDir)) {
+    mkdirSync(destIconsDir, { recursive: true })
+    cpSync(srcIconsDir, destIconsDir, { recursive: true })
+    console.log('✅ Ícones SVG copiados: src/assets/icons -> static/img/icons')
+  } else {
+    console.log('ℹ️  Pasta de ícones não encontrada em src/assets/icons (ignorando)')
+  }
+} catch (e) {
+  console.warn('⚠️  Não foi possível copiar a pasta de ícones:', e.message)
+}
+
 // Reescreve o index.html para apontar para as novas pastas
 const indexPath = resolve(distDir, 'index.html')
 try {

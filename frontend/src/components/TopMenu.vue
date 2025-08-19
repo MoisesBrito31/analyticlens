@@ -17,19 +17,19 @@
       <!-- Menu principal - Desktop -->
       <div class="nav-section desktop-nav">
         <router-link to="/" class="nav-item" active-class="active">
-          <i class="bi bi-house-door"></i>
+          <Icon name="house-door" size="1.25rem" />
           <span>Início</span>
         </router-link>
         <router-link to="/machines" class="nav-item" active-class="active">
-          <i class="bi bi-cpu"></i>
+          <Icon name="cpu" size="1.25rem" />
           <span>Máquinas</span>
         </router-link>
         <router-link to="/inspections" class="nav-item" active-class="active">
-          <i class="bi bi-clipboard-check"></i>
+          <Icon name="clipboard-check" size="1.25rem" />
           <span>Inspeções</span>
         </router-link>
         <router-link to="/configurations" class="nav-item" active-class="active">
-          <i class="bi bi-gear"></i>
+          <Icon name="gear" size="1.25rem" />
           <span>Configurações</span>
         </router-link>
       </div>
@@ -51,7 +51,7 @@
         
         <div class="user-actions">
           <button class="action-btn" @click="logout" title="Sair">
-            <i class="bi bi-box-arrow-right"></i>
+            <Icon name="box-arrow-right" size="1.1rem" />
           </button>
         </div>
       </div>
@@ -80,32 +80,32 @@
           </div>
         </div>
         <button class="close-btn" @click="toggleMobileMenu">
-          <i class="bi bi-x-lg"></i>
+          <Icon name="x-lg" size="1.2rem" />
         </button>
       </div>
       
       <div class="mobile-nav">
         <router-link to="/" class="mobile-nav-item" @click="closeMobileMenu">
-          <i class="bi bi-house-door"></i>
+          <Icon name="house-door" size="1.25rem" />
           <span>Início</span>
         </router-link>
         <router-link to="/machines" class="mobile-nav-item" @click="closeMobileMenu">
-          <i class="bi bi-cpu"></i>
+          <Icon name="cpu" size="1.25rem" />
           <span>Máquinas</span>
         </router-link>
         <router-link to="/inspections" class="mobile-nav-item" @click="closeMobileMenu">
-          <i class="bi bi-clipboard-check"></i>
+          <Icon name="clipboard-check" size="1.25rem" />
           <span>Inspeções</span>
         </router-link>
         <router-link to="/configurations" class="mobile-nav-item" @click="closeMobileMenu">
-          <i class="bi bi-gear"></i>
+          <Icon name="gear" size="1.25rem" />
           <span>Configurações</span>
         </router-link>
       </div>
       
       <div class="mobile-actions">
         <button class="mobile-logout-btn" @click="handleMobileLogout">
-          <i class="bi bi-box-arrow-right"></i>
+          <Icon name="box-arrow-right" size="1.1rem" />
           <span>Sair</span>
         </button>
       </div>
@@ -120,6 +120,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import Icon from '@/components/Icon.vue'
 import { BAvatar } from 'bootstrap-vue-3'
 
 const auth = useAuthStore()

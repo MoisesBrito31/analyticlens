@@ -1,5 +1,6 @@
 <script setup>
 import TopMenu from '@/components/TopMenu.vue'
+import Icon from '@/components/Icon.vue'
 import { useAuthStore } from '@/stores/auth'
 
 import {
@@ -28,7 +29,7 @@ import { getImagePath } from '@/utils/imageRouter'
           <BCard class="shadow-sm border-0">
             <BCardHeader class="bg-primary text-white">
               <div class="d-flex align-items-center">
-                <i class="bi bi-house me-3 fs-2"></i>
+                <Icon name="house" size="1.5rem" class="me-3" />
                 <div>
                   <h2 class="mb-0">Bem-vindo ao analyticLens</h2>
                   <p class="mb-0 opacity-75">Sistema de Visão Computacional</p>
@@ -51,7 +52,7 @@ import { getImagePath } from '@/utils/imageRouter'
                   <BCard class="border-0 bg-light h-100">
                     <BCardBody class="p-3 p-md-4">
                       <h5 class="card-title">
-                        <i class="bi bi-person-circle me-2"></i>
+                        <Icon name="person-circle" size="1.2rem" class="me-2" />
                         Informações do Usuário
                       </h5>
                       <BListGroup flush>
@@ -78,7 +79,7 @@ import { getImagePath } from '@/utils/imageRouter'
                   <hr class="my-4">
                   <div class="text-center">
                     <p class="text-muted mb-0">
-                      <i class="bi bi-clock me-1"></i>
+                      <Icon name="clock" size="1rem" class="me-1" />
                       Última atualização: {{ new Date().toLocaleString('pt-BR') }}
                     </p>
                   </div>

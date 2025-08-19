@@ -7,7 +7,7 @@
           <BCard class="shadow-sm border-0">
             <BCardHeader class="bg-warning text-dark">
               <div class="d-flex align-items-center">
-                <i class="bi bi-gear me-3 fs-2"></i>
+                <Icon name="gear" size="1.5rem" class="me-3" />
                 <div>
                   <h2 class="mb-0">Configurações do Sistema</h2>
                   <p class="mb-0 opacity-75">Gerencie as configurações e parâmetros do analyticLens</p>
@@ -18,14 +18,14 @@
               <BRow>
                 <BCol cols="12">
                   <BAlert variant="warning" show class="mb-4">
-                    <i class="bi bi-info-circle me-2"></i>
+                    <Icon name="info-circle" size="1.2rem" class="me-2" />
                     <strong>Status:</strong> Sistema de configurações em desenvolvimento.
                     Aqui você poderá ajustar parâmetros do sistema, usuários e permissões.
                   </BAlert>
                   
                   <BCard class="border-0 bg-light">
                     <BCardBody class="text-center py-4 py-md-5">
-                      <i class="bi bi-gear text-muted mb-3" style="font-size: 4rem; opacity: 0.5;"></i>
+                      <Icon name="gear" size="4rem" class="text-muted mb-3" style="opacity: 0.5;" />
                       <h5 class="text-muted">Funcionalidade em Desenvolvimento</h5>
                       <p class="text-muted mb-0">
                         A funcionalidade de configurações será implementada em breve.
@@ -41,11 +41,11 @@
                   <hr class="my-4">
                   <div class="d-flex justify-content-between align-items-center">
                     <small class="text-muted">
-                      <i class="bi bi-clock me-1"></i>
+                      <Icon name="clock" size="1rem" class="me-1" />
                       Última verificação: {{ new Date().toLocaleString('pt-BR') }}
                     </small>
                     <BButton variant="outline-warning" size="sm">
-                      <i class="bi bi-arrow-clockwise me-1"></i>
+                      <Icon name="arrow-clockwise" size="1rem" class="me-1" />
                       Atualizar
                     </BButton>
                   </div>
@@ -61,6 +61,7 @@
 
 <script setup>
 import TopMenu from '@/components/TopMenu.vue'
+import Icon from '@/components/Icon.vue'
 import {
   BContainer,
   BRow,

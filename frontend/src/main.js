@@ -9,14 +9,8 @@ import BootstrapVue3 from 'bootstrap-vue-3'
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-3/dist/bootstrap-vue-3.css'
 
-// Bootstrap Icons: original para dev, local para build
-if (import.meta.env?.DEV) {
-  // Em desenvolvimento: usa o Bootstrap Icons original
-  import('bootstrap-icons/font/bootstrap-icons.css')
-} else {
-  // Em produção: usa nosso CSS local
-  import('./assets/bootstrap-icons-local.css')
-}
+
+
 
 import { plugin as FormKit, defaultConfig } from '@formkit/vue'
 import '@formkit/themes/genesis'
