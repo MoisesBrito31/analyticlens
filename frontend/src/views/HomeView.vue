@@ -1,6 +1,7 @@
 <script setup>
 import TopMenu from '@/components/TopMenu.vue'
 import { useAuthStore } from '@/stores/auth'
+
 import {
   BContainer,
   BRow,
@@ -14,6 +15,8 @@ import {
 } from 'bootstrap-vue-3'
 
 const auth = useAuthStore()
+
+import { getImagePath } from '@/utils/imageRouter'
 </script>
 
 <template>
@@ -36,7 +39,7 @@ const auth = useAuthStore()
               <BRow class="g-4">
                 <BCol cols="12" md="6">
                   <div class="text-center mb-4 mb-md-0">
-                    <img src="/logo-large.svg" alt="Logo" class="mb-3" style="width: 120px; height: 120px;" />
+                    <img :src="getImagePath('logo-large.svg')" alt="Logo" class="mb-3" style="width: 120px; height: 120px;" />
                     <h4 class="text-primary">Sistema Inteligente</h4>
                     <p class="text-muted">
                       Plataforma avançada para inspeção e análise de imagens usando 

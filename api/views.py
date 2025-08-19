@@ -15,3 +15,12 @@ def home_view(request):
         },
         "status": "authenticated"
     })
+
+
+def health_check(request):
+    """Verificação de saúde da API - não requer autenticação"""
+    return JsonResponse({
+        "status": "healthy",
+        "message": "API funcionando corretamente",
+        "timestamp": "2024-01-01T00:00:00Z"
+    })

@@ -13,6 +13,24 @@ export default defineConfig({
   build: {
     manifest: true,
     outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          // Garante que fontes e imagens tenham nomes consistentes
+          if (assetInfo.name.endsWith('.woff2')) {
+            return 'assets/[name][extname]'
+          }
+          if (assetInfo.name.endsWith('.woff')) {
+            return 'assets/[name][extname]'
+          }
+          if (assetInfo.name.endsWith('.svg')) {
+            return 'assets/[name][extname]'
+          }
+          return 'assets/[name]-[hash][extname]'
+        }
+      }
+    }
   },
   server: {
     proxy: {

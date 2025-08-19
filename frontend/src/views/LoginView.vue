@@ -3,7 +3,7 @@
     <div class="login-background">
       <BCard class="login-card shadow-lg border-0">
         <div class="text-center mb-4">
-          <img src="@/assets/logo-large.svg" alt="analyticLens Logo" class="login-logo mb-3" />
+                     <img :src="getImagePath('logo-large.svg')" alt="analyticLens Logo" class="login-logo mb-3" />
           <h1 class="login-title">analyticLens</h1>
           <p class="login-subtitle">Sistema de Visão Computacional</p>
         </div>
@@ -91,6 +91,8 @@ const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
+
+import { getImagePath } from '@/utils/imageRouter'
 
 async function handleLogin() {
   if (!username.value || !password.value) {

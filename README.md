@@ -144,7 +144,9 @@ analyticLens/
 │  └─ vite.config.js     # configuração Vite + proxy
 ├─ server/               # Django project
 │  ├─ templates/         # index.html do SPA (reescrito no build)
-│  ├─ static/frontend/   # bundles do Vite copiados no build
+│  ├─ static/js/         # arquivos JavaScript
+│  ├─ static/css/        # arquivos CSS e fontes
+│  └─ static/img/        # imagens e ícones
 │  ├─ settings.py        # configuração Django
 │  └─ urls.py            # roteamento principal
 ├─ user/                 # app de autenticação (User custom + endpoints /api/auth/*)
@@ -200,7 +202,7 @@ analyticLens/
   - Frontend: `cd frontend && npm run dev`
   - Vision Machine: `cd vision_machine && python vm.py`
 - Produção/local:
-  - `cd frontend && npm run build` (gera `dist/` e copia para `server/static/frontend/` e reescreve `server/templates/index.html`)
+  - `cd frontend && npm run build` (gera `dist/` e organiza em `server/static/js/`, `css/`, `img/` e reescreve `server/templates/index.html`)
   - `python manage.py runserver`
   - `cd vision_machine && python vm.py`
 

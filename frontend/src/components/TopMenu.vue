@@ -5,7 +5,7 @@
       <div class="brand-section">
         <router-link to="/" class="brand-link">
           <div class="logo-container">
-            <img src="@/assets/logo.svg" alt="analyticLens Logo" class="brand-logo">
+                         <img :src="getImagePath('logo.svg')" alt="analyticLens Logo" class="brand-logo">
           </div>
           <div class="brand-text">
             <span class="brand-name">analyticLens</span>
@@ -125,6 +125,8 @@ import { BAvatar } from 'bootstrap-vue-3'
 const auth = useAuthStore()
 const router = useRouter()
 const showMobileMenu = ref(false)
+
+import { getImagePath } from '@/utils/imageRouter'
 
 function getInitials(username) {
   if (!username) return 'U'

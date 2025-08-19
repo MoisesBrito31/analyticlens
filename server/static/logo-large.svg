@@ -1,0 +1,83 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradientes simples e elegantes -->
+  <defs>
+    <!-- Fundo principal - azul claro -->
+    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E0F2FE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#BAE6FD;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Borda - azul médio -->
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7DD3FC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#38BDF8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Elementos internos - azul escuro -->
+    <linearGradient id="elementGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E40AF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Lupa - branco com borda azul -->
+    <linearGradient id="magnifierGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F8FAFC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundo principal - quadrado arredondado -->
+  <rect x="6" y="6" width="108" height="108" rx="24" fill="url(#mainGradient)" stroke="url(#borderGradient)" stroke-width="4.5"/>
+  
+  <!-- Lupa principal - CENTRO (mais bonita com cabo no canto inferior direito, girada 45° no sentido horário) -->
+  <g transform="translate(60, 60) rotate(45)">
+    <!-- Lente da lupa -->
+    <circle cx="0" cy="0" r="24" fill="url(#magnifierGradient)" stroke="url(#elementGradient)" stroke-width="6"/>
+    <!-- Interior da lente -->
+    <circle cx="0" cy="0" r="18" fill="url(#mainGradient)"/>
+    <!-- Cabo da lupa no canto inferior direito -->
+    <rect x="24" y="0" width="24" height="9" rx="4.5" fill="url(#elementGradient)" opacity="0.9"/>
+    <!-- Ponta do cabo -->
+    <path d="M 48 4.5 L 60 0 L 60 9 Z" fill="url(#elementGradient)" opacity="0.9"/>
+  </g>
+  
+  <!-- Triângulo - CANTO SUPERIOR ESQUERDO (triângulo equilátero maior, apontando para cima, mais próximo do canto) -->
+  <path d="M 18 30 L 42 30 L 30 12 Z" fill="url(#elementGradient)" opacity="0.9"/>
+  
+  <!-- Engrenagem - CANTO SUPERIOR DIREITO (8 dentes distribuídos uniformemente) -->
+  <g transform="translate(90, 24)">
+    <!-- Círculo azul escuro da engrenagem -->
+    <circle cx="0" cy="0" r="9" fill="url(#elementGradient)" opacity="0.9"/>
+    
+    <!-- 8 dentes da engrenagem distribuídos uniformemente -->
+    <!-- Norte -->
+    <rect x="-1.8" y="-12" width="3.6" height="24" fill="url(#elementGradient)" opacity="0.9"/>
+    <!-- Nordeste -->
+    <rect x="-1.8" y="-12" width="3.6" height="24" fill="url(#elementGradient)" opacity="0.9" transform="rotate(45 0 0)"/>
+    <!-- Leste -->
+    <rect x="-12" y="-1.8" width="24" height="3.6" fill="url(#elementGradient)" opacity="0.9"/>
+    <!-- Sudeste -->
+    <rect x="-1.8" y="-12" width="3.6" height="24" fill="url(#elementGradient)" opacity="0.9" transform="rotate(135 0 0)"/>
+    <!-- Sul -->
+    <rect x="-1.8" y="-12" width="3.6" height="24" fill="url(#elementGradient)" opacity="0.9" transform="rotate(180 0 0)"/>
+    <!-- Sudoeste -->
+    <rect x="-1.8" y="-12" width="3.6" height="24" fill="url(#elementGradient)" opacity="0.9" transform="rotate(225 0 0)"/>
+    <!-- Oeste -->
+    <rect x="-12" y="-1.8" width="24" height="3.6" fill="url(#elementGradient)" opacity="0.9" transform="rotate(180 0 0)"/>
+    <!-- Noroeste -->
+    <rect x="-1.8" y="-12" width="3.6" height="24" fill="url(#elementGradient)" opacity="0.9" transform="rotate(315 0 0)"/>
+    
+    <!-- Círculo branco pequeno no centro -->
+    <circle cx="0" cy="0" r="4.5" fill="url(#magnifierGradient)" opacity="0.9"/>
+  </g>
+  
+  <!-- Câmera - CANTO INFERIOR ESQUERDO (mais próxima do canto) -->
+  <g transform="translate(30, 90)">
+    <!-- Corpo da câmera -->
+    <rect x="-9" y="-7.5" width="18" height="15" rx="3" fill="url(#elementGradient)" opacity="0.9"/>
+    <!-- Lente da câmera -->
+    <circle cx="0" cy="0" r="4.5" fill="url(#mainGradient)" stroke="url(#elementGradient)" stroke-width="1.5"/>
+    <!-- Interior da lente -->
+    <circle cx="0" cy="0" r="3" fill="url(#elementGradient)" opacity="0.7"/>
+  </g>
+</svg>

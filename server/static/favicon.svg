@@ -1,0 +1,63 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradientes modernos -->
+  <defs>
+    <!-- Fundo principal - azul claro suave -->
+    <linearGradient id="faviconMainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E0F2FE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#BAE6FD;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Borda - azul médio -->
+    <linearGradient id="faviconBorderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7DD3FC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#38BDF8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Elementos internos - azul escuro -->
+    <linearGradient id="faviconElementGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E40AF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Lupa - branco com borda azul -->
+    <linearGradient id="faviconMagnifierGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F8FAFC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundo principal - quadrado arredondado -->
+  <rect x="1.5" y="1.5" width="29" height="29" rx="6" fill="url(#faviconMainGradient)" stroke="url(#faviconBorderGradient)" stroke-width="1"/>
+  
+  <!-- Triângulo superior esquerdo -->
+  <path d="M 6 9 L 9 6 L 12 9 L 9 12 Z" fill="url(#faviconElementGradient)" opacity="0.8"/>
+  
+  <!-- Engrenagem superior direita -->
+  <g transform="translate(22, 7)">
+    <circle cx="0" cy="0" r="2.5" fill="url(#faviconElementGradient)" opacity="0.8"/>
+    <circle cx="0" cy="0" r="1.2" fill="url(#faviconMainGradient)"/>
+    <!-- Dentes da engrenagem -->
+    <rect x="-0.4" y="-3.5" width="0.8" height="1.5" fill="url(#faviconElementGradient)" opacity="0.8"/>
+    <rect x="-0.4" y="2" width="0.8" height="1.5" fill="url(#faviconElementGradient)" opacity="0.8"/>
+    <rect x="-3.5" y="-0.4" width="1.5" height="0.8" fill="url(#faviconElementGradient)" opacity="0.8"/>
+    <rect x="2" y="-0.4" width="1.5" height="0.8" fill="url(#faviconElementGradient)" opacity="0.8"/>
+  </g>
+  
+  <!-- Círculo inferior esquerdo -->
+  <circle cx="9" cy="23" r="2.5" fill="url(#faviconElementGradient)" opacity="0.8"/>
+  
+  <!-- Lupa principal (magnifying glass) -->
+  <g transform="translate(16, 16)">
+    <!-- Lente da lupa -->
+    <circle cx="0" cy="0" r="6" fill="url(#faviconMagnifierGradient)" stroke="url(#faviconElementGradient)" stroke-width="1.2"/>
+    <!-- Interior da lente -->
+    <circle cx="0" cy="0" r="4.5" fill="url(#faviconMainGradient)"/>
+    <!-- Cabo da lupa -->
+    <rect x="5" y="-0.8" width="4" height="1.6" rx="0.8" fill="url(#faviconElementGradient)" opacity="0.8"/>
+    <!-- Ponta do cabo -->
+    <path d="M 9 0 L 11 -1.2 L 11 1.2 Z" fill="url(#faviconElementGradient)" opacity="0.8"/>
+  </g>
+  
+  <!-- Efeito de brilho sutil -->
+  <circle cx="13" cy="13" r="0.8" fill="white" opacity="0.6"/>
+</svg>

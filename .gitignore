@@ -26,7 +26,9 @@ frontend/.eslintcache
 frontend/.cache/
 
 # Bundles copiados para o Django (gerados no build)
-server/static/frontend/
+server/static/js/
+server/static/css/
+server/static/img/
 server/templates/index.html
 
 # Outros
