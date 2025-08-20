@@ -28,6 +28,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/machines/new',
+      name: 'machines-new',
+      component: MachinesView, // Por enquanto usa o mesmo componente
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/machines/:id',
+      name: 'machines-detail',
+      component: MachinesView, // Por enquanto usa o mesmo componente
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/inspections',
       name: 'inspections',
       component: InspectionsView,

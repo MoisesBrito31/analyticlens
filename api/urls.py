@@ -1,9 +1,36 @@
 from django.urls import path
-from .views import home_view, health_check
+from .views import (
+    home_view, 
+    health_check,
+    # DRF VM API Views
+    VMListCreate,
+    VMDetail,
+    VMAction,
+    VMStatusSummary
+)
 
 urlpatterns = [
     path('', health_check, name='health_check'),  # Rota raiz da API
     path('home', home_view, name='home'),
+    
+    # ============================================================================
+    # VISION MACHINE (VM) API ROUTES - DRF
+    # ============================================================================
+    
+    # VMs - Lista e criação
+    path('vms', VMListCreate.as_view(), name='vm_list_create'),
+    
+    # VM específica - Detalhes, atualização e remoção
+    path('vms/<int:vm_id>', VMDetail.as_view(), name='vm_detail'),
+    
+    # Ações da VM - Start, stop, restart, trigger
+    path('vms/<int:vm_id>/action', VMAction.as_view(), name='vm_action'),
+    
+
+    
+    # Resumo do status de todas as VMs
+    path('vms/status/summary', VMStatusSummary.as_view(), name='vm_status_summary'),
+    
     # Outras rotas da API serão adicionadas gradualmente
 ]
 
