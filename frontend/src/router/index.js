@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import HomeView from '@/views/HomeView.vue'
 import LoginView from '@/views/LoginView.vue'
 import MachinesView from '@/views/MachinesView.vue'
+import MachineDetailView from '@/views/MachineDetailView.vue'
 import InspectionsView from '@/views/InspectionsView.vue'
 import ConfigurationsView from '@/views/ConfigurationsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
@@ -36,7 +37,7 @@ const router = createRouter({
     {
       path: '/machines/:id',
       name: 'machines-detail',
-      component: MachinesView, // Por enquanto usa o mesmo componente
+      component: MachineDetailView,
       meta: { requiresAuth: true }
     },
     {

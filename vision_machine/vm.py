@@ -19,6 +19,7 @@ import threading
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pathlib import Path
+import base64
 
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
@@ -278,6 +279,7 @@ class TestModeProcessor:
         self.rejected_count = 0
         self.last_websocket_update = 0
         self.websocket_update_interval = 1.0  # 1 segundo
+        self.last_frame = None
         
         # Controle para modo gatilho
         self.trigger_requested = False
@@ -358,6 +360,8 @@ class TestModeProcessor:
                 # Obter frame da fonte de imagem
                 frame = self.vm.image_source.get_frame()
                 if frame is not None:
+                    # Guardar último frame para transmissão
+                    self.last_frame = frame
                     logger.info(f"📸 Frame {self.frame_count + 1} obtido, processando...")
                     
                     # Processar frame (simulação de inspeção)
@@ -496,6 +500,19 @@ class TestModeProcessor:
                     'source_type': source_type,
                     'mode': self.vm.mode
                 }
+
+                # Incluir imagem atual em JPEG base64 (uma vez por atualização)
+                try:
+                    if self.last_frame is not None:
+                        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+                        ok, jpeg_buf = cv2.imencode('.jpg', self.last_frame, encode_param)
+                        if ok:
+                            jpeg_bytes = jpeg_buf.tobytes()
+                            websocket_data['image_base64'] = base64.b64encode(jpeg_bytes).decode('ascii')
+                            websocket_data['mime'] = 'image/jpeg'
+                            websocket_data['resolution'] = [int(self.last_frame.shape[1]), int(self.last_frame.shape[0])]
+                except Exception as e:
+                    logger.debug(f"Falha ao anexar imagem ao WebSocket: {str(e)}")
                 
                 logger.info(f"📡 Enviando para WebSocket: {websocket_data}")
                 

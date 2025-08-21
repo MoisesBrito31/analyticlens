@@ -48,7 +48,8 @@ export function getImagePath(imageName) {
   if (isDev) {
     // Em desenvolvimento: usa caminho que o Vite resolve
     // O Vite resolve automaticamente assets da pasta src/assets/
-    return `./src/assets/${imageName}`;
+    // Precisa ser caminho absoluto para funcionar em rotas aninhadas (ex.: /machines/123)
+    return `/src/assets/${imageName}`;
   } else {
     // Em produção: usa /static/img/ do Django
     return `/static/img/${imageName}`;

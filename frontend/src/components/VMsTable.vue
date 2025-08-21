@@ -128,6 +128,17 @@
         <template #cell(actions)="{ item }">
           <div class="d-flex gap-1">
             <BButton
+              v-if="item.status !== 'offline'"
+              size="sm"
+              variant="outline-primary"
+              @click="goToVMDetail(item.id)"
+              :disabled="loading"
+              title="Detalhes da VM"
+            >
+              <Icon name="camera" size="0.8rem" />
+            </BButton>
+
+            <BButton
               v-if="item.status === 'stopped' || item.status === 'error'"
               size="sm"
               variant="success"
@@ -220,6 +231,7 @@ import {
   BCol,
   BModal
 } from 'bootstrap-vue-3'
+import { useRouter } from 'vue-router'
 
 // Props e emits
 const props = defineProps({
@@ -230,6 +242,11 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['vm-action', 'refresh', 'error'])
+const router = useRouter()
+
+const goToVMDetail = (vmId) => {
+  router.push(`/machines/${vmId}`)
+}
 
 // Estado reativo
 const loading = ref(false)

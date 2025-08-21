@@ -29,14 +29,36 @@
         },
         "area_max": 1000,
         "area_min": 100,
-        "blob_count_test": true,
+        "blob_count_test": false,
         "id": 2,
         "inspec_pass_fail": true,
         "name": "blob_1",
         "test_blob_count_max": 5,
         "test_blob_count_min": 4,
-        "test_total_area_max": 100,
+        "test_total_area_max": 600,
         "test_total_area_min": 50,
+        "th_max": 255,
+        "th_min": 130,
+        "total_area_test": true,
+        "type": "blob"
+      },
+      {
+        "ROI": {
+          "h": 300,
+          "w": 300,
+          "x": 0,
+          "y": 10
+        },
+        "area_max": 1000,
+        "area_min": 100,
+        "blob_count_test": false,
+        "id": 3,
+        "inspec_pass_fail": false,
+        "name": "blob_1",
+        "test_blob_count_max": 5,
+        "test_blob_count_min": 4,
+        "test_total_area_max": 2000,
+        "test_total_area_min": 600,
         "th_max": 255,
         "th_min": 130,
         "total_area_test": true,
@@ -57,8 +79,8 @@
   },
   "trigger_config": {
     "type": "continuous",
-    "interval_ms": 1000
+    "interval_ms": 2000
   },
   "error_msg": "",
-  "last_saved": "2025-08-20T00:55:54.417045"
+  "last_saved": "2025-08-21T04:22:25.625501"
 }
