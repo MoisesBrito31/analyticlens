@@ -48,11 +48,29 @@ class BlobTool(BaseTool):
             for contour in contours:
                 area = cv2.contourArea(contour)
                 if self.area_min <= area <= self.area_max:
-                    # Informações simplificadas para WebSocket (sem arrays numpy)
+                    # Calcular centróide e bounding box
+                    centroid = self._calculate_centroid(contour)
+                    bbox = list(cv2.boundingRect(contour))
+
+                    # Contorno simplificado (polígono) com pontos inteiros e fechado
+                    try:
+                        peri = cv2.arcLength(contour, True)
+                        epsilon = max(1.0, 0.01 * peri)
+                        approx = cv2.approxPolyDP(contour, epsilon, True)
+                        pts = approx.reshape(-1, 2).astype('int32')
+                        poly = pts.tolist()
+                        # Garantir fechamento
+                        if len(poly) > 0 and (poly[0][0] != poly[-1][0] or poly[0][1] != poly[-1][1]):
+                            poly.append(poly[0])
+                    except Exception:
+                        poly = []
+
+                    # Informações para WebSocket (sem numpy)
                     valid_blobs.append({
-                        'area': float(area),  # Converter para float padrão
-                        'centroid': self._calculate_centroid(contour),
-                        'bounding_box': list(cv2.boundingRect(contour))  # Converter para lista
+                        'area': float(area),
+                        'centroid': centroid,
+                        'bounding_box': bbox,
+                        'contour': poly  # Coordenadas no espaço do ROI
                     })
                     total_area += area
             
