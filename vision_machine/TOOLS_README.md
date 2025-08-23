@@ -109,6 +109,17 @@ BaseTool (abstrata)
 - `test_blob_count_min`/`test_blob_count_max`: Limites para teste de contagem
 - `total_area_test`: Se deve executar teste de área total
 - `blob_count_test`: Se deve executar teste de contagem
+ - `pre_blur`: Suavização antes do threshold. Valores: `gaussian`, `median`, `null`
+ - `pre_blur_ksize`: Tamanho do kernel de blur (ímpar, padrão 3)
+ - `pre_blur_sigma`: Sigma do GaussianBlur (padrão 0)
+ - `morph_kernel`: Kernel morfológico (ímpar, padrão 3)
+ - `morph_open`: Iterações de abertura (remove ruído pequeno)
+ - `morph_close`: Iterações de fechamento (suaviza bordas e preenche buracos)
+ - `use_range_threshold`: Usa faixa `[th_min, th_max]` ao invés de limiar único
+ - `use_otsu`: Usa Otsu automático (ignora `th_min/th_max`)
+ - `contour_chain`: Cadeia de contorno: `SIMPLE` | `NONE` | `TC89_L1` | `TC89_KCOS`
+ - `approx_epsilon_ratio`: Fração do perímetro para `approxPolyDP` (0 desabilita)
+ - `polygon_max_points`: Limite de pontos no polígono retornado (0 = sem limite)
 
 **Exemplo**:
 ```json
@@ -127,7 +138,17 @@ BaseTool (abstrata)
   "test_blob_count_min": 4,
   "total_area_test": true,
   "blob_count_test": true,
-  "inspec_pass_fail": true
+  "inspec_pass_fail": true,
+  "pre_blur": "gaussian",
+  "pre_blur_ksize": 5,
+  "pre_blur_sigma": 0.8,
+  "morph_kernel": 3,
+  "morph_open": 1,
+  "morph_close": 1,
+  "use_range_threshold": true,
+  "contour_chain": "TC89_KCOS",
+  "approx_epsilon_ratio": 0.003,
+  "polygon_max_points": 500
 }
 ```
 

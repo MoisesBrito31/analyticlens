@@ -2,7 +2,14 @@ import time
 from typing import Dict, Any, List
 import cv2
 import numpy as np
-from tools import BlobTool, GrayscaleTool, MathTool
+from tools import (
+    BlobTool,
+    GrayscaleTool,
+    MathTool,
+    BlurFilterTool,
+    ThresholdFilterTool,
+    MorphologyFilterTool,
+)
 
 class InspectionProcessor:
     """Processador principal para coordenação das ferramentas de inspeção"""
@@ -35,6 +42,12 @@ class InspectionProcessor:
                 return BlobTool(config)
             elif tool_type == 'grayscale':
                 return GrayscaleTool(config)
+            elif tool_type == 'blur':
+                return BlurFilterTool(config)
+            elif tool_type == 'threshold':
+                return ThresholdFilterTool(config)
+            elif tool_type == 'morphology':
+                return MorphologyFilterTool(config)
             elif tool_type == 'math':
                 return MathTool(config)
             else:

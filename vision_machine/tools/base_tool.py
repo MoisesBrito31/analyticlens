@@ -61,7 +61,7 @@ class BaseTool(ABC):
     
     def is_filter_tool(self) -> bool:
         """Verifica se é ferramenta de filtro (modifica imagem)"""
-        return self.type in ['grayscale', 'blur', 'sharpen', 'threshold']
+        return self.type in ['grayscale', 'blur', 'sharpen', 'threshold', 'morphology']
     
     def is_analysis_tool(self) -> bool:
         """Verifica se é ferramenta de análise (gera resultados)"""

@@ -14,7 +14,6 @@
           "y": 0
         },
         "id": 1,
-        "inspec_pass_fail": true,
         "method": "luminance",
         "name": "grayscale_filter",
         "normalize": false,
@@ -40,7 +39,10 @@
         "th_max": 255,
         "th_min": 130,
         "total_area_test": true,
-        "type": "blob"
+        "type": "blob",
+        "contour_chain": "TC89_KCOS",
+        "approx_epsilon_ratio": 0.003,
+        "polygon_max_points": 1000
       },
       {
         "ROI": {
@@ -62,7 +64,10 @@
         "th_max": 255,
         "th_min": 130,
         "total_area_test": true,
-        "type": "blob"
+        "type": "blob",
+        "contour_chain": "TC89_KCOS",
+        "approx_epsilon_ratio": 0.003,
+        "polygon_max_points": 1000
       },
       {
         "ROI": {
@@ -84,7 +89,10 @@
         "th_max": 255,
         "th_min": 130,
         "total_area_test": true,
-        "type": "blob"
+        "type": "blob",
+        "contour_chain": "TC89_KCOS",
+        "approx_epsilon_ratio": 0.003,
+        "polygon_max_points": 1000
       },
       {
         "ROI": {
@@ -106,7 +114,10 @@
         "th_max": 255,
         "th_min": 130,
         "total_area_test": true,
-        "type": "blob"
+        "type": "blob",
+        "contour_chain": "TC89_KCOS",
+        "approx_epsilon_ratio": 0.003,
+        "polygon_max_points": 1000
       }
     ]
   },
@@ -126,5 +137,5 @@
     "interval_ms": 2000
   },
   "error_msg": "",
-  "last_saved": "2025-08-21T20:51:06.473244"
+  "last_saved": "2025-08-23T20:38:22.143408"
 }

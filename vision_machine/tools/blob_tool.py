@@ -19,6 +19,11 @@ class BlobTool(BaseTool):
         self.test_blob_count_min = config.get('test_blob_count_min', 0)
         self.total_area_test = config.get('total_area_test', False)
         self.blob_count_test = config.get('blob_count_test', False)
+
+        # Controle de extração e aproximação de contorno
+        self.contour_chain = str(config.get('contour_chain', 'SIMPLE')).upper()  # SIMPLE | NONE | TC89_L1 | TC89_KCOS
+        self.approx_epsilon_ratio = float(config.get('approx_epsilon_ratio', 0.01))  # fração do perímetro; 0 desabilita
+        self.polygon_max_points = int(config.get('polygon_max_points', 0))  # 0 = sem limite
     
     def process(self, image: np.ndarray, roi_image: np.ndarray, 
                 previous_results: Dict[int, Dict] = None) -> Dict[str, Any]:
@@ -35,11 +40,11 @@ class BlobTool(BaseTool):
                 gray_image = roi_image
                 print(f"    ✅ {self.name}: Imagem recebida em grayscale (otimizado)")
             
-            # Aplicar threshold
+            # Aplicar threshold simples (análise interna, não altera imagem base do pipeline)
             _, binary = cv2.threshold(gray_image, self.th_min, self.th_max, cv2.THRESH_BINARY)
             
             # Encontrar contornos
-            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, self._chain_mode())
             
             # Filtrar por área
             valid_blobs = []
@@ -52,18 +57,8 @@ class BlobTool(BaseTool):
                     centroid = self._calculate_centroid(contour)
                     bbox = list(cv2.boundingRect(contour))
 
-                    # Contorno simplificado (polígono) com pontos inteiros e fechado
-                    try:
-                        peri = cv2.arcLength(contour, True)
-                        epsilon = max(1.0, 0.01 * peri)
-                        approx = cv2.approxPolyDP(contour, epsilon, True)
-                        pts = approx.reshape(-1, 2).astype('int32')
-                        poly = pts.tolist()
-                        # Garantir fechamento
-                        if len(poly) > 0 and (poly[0][0] != poly[-1][0] or poly[0][1] != poly[-1][1]):
-                            poly.append(poly[0])
-                    except Exception:
-                        poly = []
+                    # Contorno com controle de fidelidade
+                    poly = self._build_polygon_from_contour(contour)
 
                     # Informações para WebSocket (sem numpy)
                     valid_blobs.append({
@@ -167,3 +162,42 @@ class BlobTool(BaseTool):
             return False
         
         return True
+
+    # ----------------------
+    # Métodos auxiliares
+    # ----------------------
+
+    def _chain_mode(self) -> int:
+        """Mapeia configuração de cadeia de contorno para constante do OpenCV."""
+        mode = self.contour_chain
+        if mode == 'NONE':
+            return cv2.CHAIN_APPROX_NONE
+        if mode == 'TC89_L1':
+            return cv2.CHAIN_APPROX_TC89_L1
+        if mode == 'TC89_KCOS':
+            return cv2.CHAIN_APPROX_TC89_KCOS
+        return cv2.CHAIN_APPROX_SIMPLE
+
+    def _build_polygon_from_contour(self, contour) -> List[List[int]]:
+        """Gera polígono a partir do contorno com aproximação e amostragem opcional."""
+        try:
+            pts = contour
+            # Aproximação controlada por epsilon (0 desabilita)
+            if self.approx_epsilon_ratio and self.approx_epsilon_ratio > 0:
+                peri = max(1e-6, cv2.arcLength(contour, True))
+                epsilon = max(0.5, float(self.approx_epsilon_ratio) * peri)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                pts = approx
+            # Converter para lista de pontos inteiros (x, y)
+            pts_xy = pts.reshape(-1, 2).astype('int32')
+            # Limitar número de pontos para performance, se configurado
+            if self.polygon_max_points and self.polygon_max_points > 0 and len(pts_xy) > self.polygon_max_points:
+                step = int(np.ceil(len(pts_xy) / float(self.polygon_max_points)))
+                pts_xy = pts_xy[::max(1, step)]
+            poly = pts_xy.tolist()
+            # Garantir fechamento do polígono
+            if len(poly) > 0 and (poly[0][0] != poly[-1][0] or poly[0][1] != poly[-1][1]):
+                poly.append(poly[0])
+            return poly
+        except Exception:
+            return []

@@ -76,7 +76,12 @@
 
                 <!-- Visualização ao vivo -->
                 <div class="mt-4">
-                  <h4 class="mb-3">Transmissão ao vivo</h4>
+                  <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h4 class="mb-0">Transmissão ao vivo</h4>
+                    <div v-if="wsStatus">
+                      <BBadge :variant="getWsVariant(wsStatus)">{{ wsStatus }}</BBadge>
+                    </div>
+                  </div>
                   <BRow class="live-row g-3">
                     <BCol cols="12" lg="12">
                       <AoVivoImg
@@ -89,7 +94,7 @@
                         :metrics="metrics"
                         fit="contain"
                       />
-                      <div class="text-muted small mt-2" v-if="wsStatus">Conexão: {{ wsStatus }}</div>
+                      
                     </BCol>
                   </BRow>
                 </div>
@@ -322,6 +327,15 @@ const formatDateTime = (dateString) => {
   } catch {
     return String(dateString)
   }
+}
+
+const getWsVariant = (status) => {
+  const s = String(status || '').toLowerCase().trim()
+  // Priorizar estados de erro/desconexão para evitar colisão com 'conectado'
+  if (s.includes('desconect') || s.includes('falha') || s.includes('fail') || s.includes('disconnected')) return 'danger'
+  if (s.includes('conectand') || s.includes('connecting')) return 'warning'
+  if (s === 'conectado' || s.includes('conectado') || s.includes('connected')) return 'success'
+  return 'secondary'
 }
 </script>
 

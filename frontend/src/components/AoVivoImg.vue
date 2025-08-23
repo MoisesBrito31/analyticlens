@@ -19,7 +19,7 @@
                 class="blob-box"
                 :style="box"
               ></div>
-              <svg v-if="showBlobContours && hasContours" class="contour-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <svg v-if="showBlobContours && hasContours" class="contour-svg" :viewBox="svgViewBox" preserveAspectRatio="none">
                 <template v-for="(path, i) in contourPaths" :key="`cp_${i}`">
                   <path
                     :d="path"
@@ -29,6 +29,7 @@
                     vector-effect="non-scaling-stroke"
                     stroke-linejoin="round"
                     stroke-linecap="round"
+                    shape-rendering="geometricPrecision"
                   />
                 </template>
               </svg>
@@ -176,7 +177,7 @@
             </div>
           </div>
           <div class="tab-pane" v-show="activeTab === 'analysis'">
-            <div class="analysis-toolbar mb-2">
+            <div class="analysis-toolbar mb-2" v-if="selectedItem && (selectedItem.tool_type === 'blob' || selectedItem.type === 'blob')">
               <button type="button" class="toggle-btn" :class="{ active: showBlobCentroids }" @click="toggleBlobCentroids">Blobs: centróides</button>
               <button type="button" class="toggle-btn" :class="{ active: showBlobBoxes }" @click="toggleBlobBoxes">Blobs: áreas</button>
               <button type="button" class="toggle-btn" :class="{ active: showBlobContours }" @click="toggleBlobContours">Blobs: contornos</button>
@@ -296,6 +297,8 @@ const displayItems = computed(() => {
 
 const baseWidth = computed(() => Array.isArray(props.resolution) ? Number(props.resolution[0]) || 0 : 0)
 const baseHeight = computed(() => Array.isArray(props.resolution) ? Number(props.resolution[1]) || 0 : 0)
+
+const svgViewBox = computed(() => `0 0 ${baseWidth.value || 100} ${baseHeight.value || 100}`)
 
 const showOverlay = computed(() => !!(selectedRoi.value && baseWidth.value > 0 && baseHeight.value > 0 && imageUrl.value))
 const hasAnyOverlay = computed(() => showOverlay.value || (blobCentroidPoints.value && blobCentroidPoints.value.length > 0) || (blobBoxes.value && blobBoxes.value.length > 0))
@@ -545,7 +548,7 @@ const paramEntries = computed(() => {
   const def = selectedDef.value
   const makeEntries = (obj) => {
     if (!obj || typeof obj !== 'object') return []
-    const { id, name, type, ROI, roi, rect, bbox, /* inspec_pass_fail, */ reference_tool_id, tool_id, tool_name, tool_type, status, image_modified, pass_fail, processing_time_ms, error, blobs, blob_count, total_area, roi_area, test_results, ...rest } = obj
+    const rest = { ...obj }
     // Remover campos de ROI explicitamente (não exibir)
     delete rest.ROI
     delete rest.roi
@@ -566,13 +569,13 @@ const groupedParams = computed(() => {
   const tests = []
   const others = []
 
-  const primaryKeys = new Set(['type', 'name', 'method', 'normalize', 'th_min', 'th_max', 'area_min', 'area_max', 'reference_tool_id', 'pass_fail'])
+  const primaryKeys = new Set(['type', 'name', 'method', 'normalize', 'th_min', 'th_max', 'area_min', 'area_max', 'reference_tool_id'])
   const testKeyPattern = /^(test_|.*_test$|.*_min$|.*_max$)/i
 
   for (const [key, val] of entries) {
     if (primaryKeys.has(key)) {
       primary.push([key, val])
-    } else if (key === 'inspec_pass_fail' || testKeyPattern.test(key)) {
+    } else if (testKeyPattern.test(key)) {
       tests.push([key, val])
     } else {
       others.push([key, val])
@@ -592,22 +595,21 @@ const groupedParams = computed(() => {
 const analysisEntries = computed(() => {
   const it = selectedItem.value
   if (!it || typeof it !== 'object') return []
-  const {
-    tool_id, tool_name, tool_type, status, image_modified, processing_time_ms,
-    pass_fail, error, ROI, roi, rect, bbox, test_results, tests, test,
-    // campos comumente volumosos
-    blobs, blob_count, total_area, roi_area,
-    ...rest
-  } = it
-
-  // Manter alguns campos de resultado úteis primeiro se existirem
+  const exclude = new Set([
+    'tool_id','tool_name','tool_type','status','image_modified','processing_time_ms',
+    'pass_fail','error','ROI','roi','rect','bbox','test_results','tests','test'
+  ])
   const preferredOrder = ['blob_count', 'total_area', 'roi_area']
+  const added = new Set()
   const result = []
   for (const key of preferredOrder) {
-    if (key in it) result.push([key, it[key]])
+    if (Object.prototype.hasOwnProperty.call(it, key)) {
+      result.push([key, it[key]])
+      added.add(key)
+    }
   }
-  // Adicionar o restante, exceto o que é metadata/config/testes
-  for (const [k, v] of Object.entries(rest)) {
+  for (const [k, v] of Object.entries(it)) {
+    if (exclude.has(k) || added.has(k)) continue
     result.push([k, v])
   }
   return result
@@ -703,8 +705,8 @@ const contourPaths = computed(() => {
   const roi = extractRoi(it) || selectedRoi.value
   const roiX = roi?.x || 0
   const roiY = roi?.y || 0
-  // Trabalhar com viewBox 0..100 -> normalizar para 0..100 sem '%' no path
-  const toView = (x, y) => `${(x / baseWidth.value) * 100} ${(y / baseHeight.value) * 100}`
+  // Usar coordenadas no espaço de pixels da imagem (viewBox = resolução real)
+  const toView = (x, y) => `${x} ${y}`
   const toPath = (pts) => {
     if (!pts || !pts.length) return ''
     const [x0, y0] = pts[0]
@@ -771,7 +773,12 @@ function passBadgeClass(passed) {
 
 function entriesWithoutMeta(test) {
   if (!test || typeof test !== 'object') return []
-  const { name, passed, ok, pass_fail, overall_pass, ...rest } = test
+  const rest = { ...test }
+  delete rest.name
+  delete rest.passed
+  delete rest.ok
+  delete rest.pass_fail
+  delete rest.overall_pass
   return Object.entries(rest)
 }
 
