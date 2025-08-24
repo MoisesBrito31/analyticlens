@@ -1,5 +1,6 @@
 export async function apiFetch(input, init = {}) {
-  const headers = new Headers(init.headers)
+  const { okStatuses, ...restInit } = init
+  const headers = new Headers(restInit.headers)
   if (init.method && init.method !== 'GET' && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
@@ -9,8 +10,9 @@ export async function apiFetch(input, init = {}) {
     const csrftoken = document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1]
     if (csrftoken) headers.set('X-CSRFToken', csrftoken)
   }
-  const res = await fetch(input, { credentials: 'include', ...init, headers })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const res = await fetch(input, { credentials: 'include', ...restInit, headers })
+  const allowed = Array.isArray(okStatuses) ? okStatuses : []
+  if (!res.ok && !allowed.includes(res.status)) throw new Error(`HTTP ${res.status}`)
   return res
 }
 

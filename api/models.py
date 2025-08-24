@@ -95,3 +95,166 @@ class VirtualMachine(models.Model):
     def get_resolution_display(self):
         """Retorna a resolução formatada"""
         return f"{self.resolution_width}x{self.resolution_height}"
+
+
+class Inspection(models.Model):
+    """Inspeção executada/definida para uma VM."""
+
+    vm = models.ForeignKey(
+        VirtualMachine,
+        on_delete=models.CASCADE,
+        related_name='inspections',
+        verbose_name='Máquina'
+    )
+    name = models.CharField(max_length=100, verbose_name='Nome da Inspeção')
+    description = models.TextField(blank=True, verbose_name='Descrição')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+
+    class Meta:
+        verbose_name = 'Inspeção'
+        verbose_name_plural = 'Inspeções'
+        ordering = ['vm_id', 'id']
+
+
+class ToolKind(models.Model):
+    """Catálogo de tipos de ferramentas (extensível via dados)."""
+
+    CATEGORY_CHOICES = [
+        ('filter', 'Filtro'),
+        ('analytic', 'Analítica'),
+        ('math', 'Matemática'),
+    ]
+
+    slug = models.SlugField(max_length=50, unique=True, verbose_name='Slug')
+    label = models.CharField(max_length=100, verbose_name='Rótulo')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, verbose_name='Categoria')
+    description = models.TextField(blank=True, verbose_name='Descrição')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Tipo de Tool'
+        verbose_name_plural = 'Tipos de Tools'
+        ordering = ['slug']
+
+class InspectionTool(models.Model):
+    """Ferramenta base: apenas campos comuns; configs ficam nos modelos específicos por tipo."""
+
+    TOOL_TYPE_CHOICES = [
+        ('grayscale', 'Grayscale'),
+        ('blur', 'Blur'),
+        ('threshold', 'Threshold'),
+        ('morphology', 'Morphology'),
+        ('blob', 'Blob'),
+        ('math', 'Math'),
+    ]
+
+    inspection = models.ForeignKey(
+        Inspection,
+        on_delete=models.CASCADE,
+        related_name='tools',
+        verbose_name='Inspeção'
+    )
+    order_index = models.PositiveIntegerField(default=0, verbose_name='Ordem no Pipeline')
+    name = models.CharField(max_length=100, verbose_name='Nome da Tool')
+    type = models.CharField(max_length=20, choices=TOOL_TYPE_CHOICES, verbose_name='Tipo')
+    tool_kind = models.ForeignKey(
+        ToolKind,
+        on_delete=models.PROTECT,
+        related_name='inspection_tools',
+        verbose_name='Tipo (ToolKind)',
+        null=True,
+        blank=True
+    )
+
+    roi_x = models.IntegerField(default=0, verbose_name='ROI X')
+    roi_y = models.IntegerField(default=0, verbose_name='ROI Y')
+    roi_w = models.IntegerField(default=0, verbose_name='ROI Largura')
+    roi_h = models.IntegerField(default=0, verbose_name='ROI Altura')
+
+    inspec_pass_fail = models.BooleanField(default=False, verbose_name='Afeta Pass/Fail')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Ferramenta de Inspeção'
+        verbose_name_plural = 'Ferramentas de Inspeção'
+        ordering = ['inspection_id', 'order_index', 'id']
+
+
+class GrayscaleTool(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='grayscale')
+    method = models.CharField(
+        max_length=20,
+        choices=[('luminance', 'Luminance'), ('average', 'Average'), ('weighted', 'Weighted')],
+        default='luminance'
+    )
+    normalize = models.BooleanField(default=False)
+
+
+class BlurTool(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='blur')
+    method = models.CharField(
+        max_length=20,
+        choices=[('gaussian', 'Gaussian'), ('median', 'Median')],
+        default='gaussian'
+    )
+    ksize = models.IntegerField(default=3, validators=[MinValueValidator(1)])
+    sigma = models.FloatField(default=0.0)
+
+
+class ThresholdTool(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='threshold')
+    mode = models.CharField(
+        max_length=20,
+        choices=[('binary', 'Binary'), ('range', 'Range'), ('otsu', 'Otsu')],
+        default='binary'
+    )
+    th_min = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(255)])
+    th_max = models.IntegerField(default=255, validators=[MinValueValidator(0), MaxValueValidator(255)])
+
+
+class MorphologyTool(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='morphology')
+    kernel = models.IntegerField(default=3, validators=[MinValueValidator(1)])
+    open = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    close = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    shape = models.CharField(
+        max_length=20,
+        choices=[('ellipse', 'Ellipse'), ('rect', 'Rect'), ('cross', 'Cross')],
+        default='ellipse'
+    )
+
+
+class BlobToolConfig(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='blob')
+    th_min = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(255)])
+    th_max = models.IntegerField(default=255, validators=[MinValueValidator(0), MaxValueValidator(255)])
+    area_min = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
+    area_max = models.FloatField(default=1e12, validators=[MinValueValidator(0.0)])
+    total_area_test = models.BooleanField(default=False)
+    blob_count_test = models.BooleanField(default=False)
+    test_total_area_min = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
+    test_total_area_max = models.FloatField(default=1e12, validators=[MinValueValidator(0.0)])
+    test_blob_count_min = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    test_blob_count_max = models.IntegerField(default=1_000_000, validators=[MinValueValidator(0)])
+    contour_chain = models.CharField(
+        max_length=20,
+        choices=[('SIMPLE', 'SIMPLE'), ('NONE', 'NONE'), ('TC89_L1', 'TC89_L1'), ('TC89_KCOS', 'TC89_KCOS')],
+        default='SIMPLE'
+    )
+    approx_epsilon_ratio = models.FloatField(default=0.01, validators=[MinValueValidator(0.0)])
+    polygon_max_points = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+
+
+class MathTool(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='math')
+    operation = models.CharField(
+        max_length=30,
+        choices=[('area_ratio', 'Area Ratio'), ('blob_density', 'Blob Density'), ('custom_formula', 'Custom Formula')],
+        blank=True
+    )
+    reference_tool = models.ForeignKey(InspectionTool, null=True, blank=True, on_delete=models.SET_NULL, related_name='referenced_by_math')
+    custom_formula = models.TextField(blank=True)

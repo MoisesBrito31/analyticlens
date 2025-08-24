@@ -6,7 +6,8 @@ from .views import (
     VMListCreate,
     VMDetail,
     VMAction,
-    VMStatusSummary
+    VMStatusSummary,
+    SaveInspection,
 )
 
 urlpatterns = [
@@ -30,6 +31,9 @@ urlpatterns = [
     
     # Resumo do status de todas as VMs
     path('vms/status/summary', VMStatusSummary.as_view(), name='vm_status_summary'),
+    
+    # Salvar inspeção a partir da VM
+    path('vms/<int:vm_id>/inspections/save', SaveInspection.as_view(), name='save_inspection'),
     
     # Outras rotas da API serão adicionadas gradualmente
 ]

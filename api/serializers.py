@@ -131,3 +131,10 @@ class VMStatusSummarySerializer(serializers.Serializer):
     error_vms = serializers.ListField()
     offline_vms = serializers.ListField()
     timestamp = serializers.DateTimeField()
+
+
+class SaveInspectionRequestSerializer(serializers.Serializer):
+    """Entrada para salvar inspeção baseada no estado atual da VM."""
+    name = serializers.CharField(max_length=100)
+    overwrite = serializers.BooleanField(required=False, default=False)
+    payload = serializers.DictField(required=False)

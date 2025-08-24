@@ -78,8 +78,18 @@
                 <div class="mt-4">
                   <div class="d-flex align-items-center justify-content-between mb-3">
                     <h4 class="mb-0">Transmissão ao vivo</h4>
-                    <div v-if="wsStatus">
-                      <BBadge :variant="getWsVariant(wsStatus)">{{ wsStatus }}</BBadge>
+                    <div class="d-flex align-items-center gap-2">
+                      <div v-if="wsStatus">
+                        <BBadge :variant="getWsVariant(wsStatus)">{{ wsStatus }}</BBadge>
+                      </div>
+                      <BButton
+                        size="sm"
+                        variant="primary"
+                        :disabled="!canSaveInspection"
+                        @click="openSaveModal"
+                      >
+                        Salvar receita
+                      </BButton>
                     </div>
                   </div>
                   <BRow class="live-row g-3">
@@ -117,10 +127,32 @@
       </BRow>
     </BContainer>
   </div>
+  
+  <!-- Modal: Salvar Inspeção -->
+  <BModal v-model="showSaveModal" title="Salvar inspeção" ok-only :ok-disabled="saveLoading" @ok="doSaveInspection(false)">
+    <BFormGroup label="Nome da inspeção" label-for="insp-name">
+      <BFormInput id="insp-name" v-model="saveName" :disabled="saveLoading" placeholder="Ex.: Inspeção Linha 1" />
+    </BFormGroup>
+  </BModal>
+
+  <!-- Modal: Confirmar Sobrescrita -->
+  <BModal v-model="showConfirmModal" title="Inspeção já existe" :ok-disabled="saveLoading" @ok="doSaveInspection(true)" ok-title="Sobrescrever" cancel-title="Cancelar">
+    Já existe uma inspeção com este nome. Deseja sobrescrever?
+  </BModal>
+
+  <!-- Toasts -->
+  <div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+    <BToast v-model="showSuccessToast" :title="toastTitle" variant="success" solid auto-hide-delay="3000">
+      {{ toastMsg }}
+    </BToast>
+    <BToast v-model="showErrorToast" :title="toastTitle" variant="danger" solid auto-hide-delay="5000">
+      {{ toastMsg }}
+    </BToast>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopMenu from '@/components/TopMenu.vue'
 import Icon from '@/components/Icon.vue'
@@ -130,6 +162,8 @@ import { BContainer, BButton, BCard, BCardBody } from 'bootstrap-vue-3'
 import { BCardHeader, BRow, BCol } from 'bootstrap-vue-3'
 import { BFormTextarea } from 'bootstrap-vue-3'
 import { BBadge } from 'bootstrap-vue-3'
+import { BModal } from 'bootstrap-vue-3'
+import { BFormInput, BFormGroup } from 'bootstrap-vue-3'
 import { io } from 'socket.io-client'
 
 const route = useRoute()
@@ -148,6 +182,64 @@ const liveToolDefs = ref([])
 const liveResolution = ref([])
 const metrics = ref({ aprovados: 0, reprovados: 0, time: '', frame: 0 })
 let sio = null
+// Controle do modal de salvar inspeção
+const showSaveModal = ref(false)
+const showConfirmModal = ref(false)
+const saveName = ref('')
+const saveLoading = ref(false)
+const showSuccessToast = ref(false)
+const showErrorToast = ref(false)
+const toastTitle = ref('')
+const toastMsg = ref('')
+
+const canSaveInspection = computed(() => {
+  const s = (wsStatus.value || '').toLowerCase()
+  return s.includes('conectado')
+})
+
+function openSaveModal() {
+  saveName.value = vm.value?.name || vm.value?.machine_id || ''
+  showSaveModal.value = true
+}
+
+async function doSaveInspection(overwrite = false) {
+  if (!vm.value) return
+  try {
+    saveLoading.value = true
+    // Tentar incluir o último JSON recebido como payload
+    let payload
+    try { payload = wsJsonText.value ? JSON.parse(wsJsonText.value) : undefined } catch { payload = undefined }
+    const res = await apiFetch(`/api/vms/${vm.value.id}/inspections/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: saveName.value, overwrite, payload }),
+      okStatuses: [200, 201, 409]
+    })
+    if (res.status === 409) {
+      // Já existe: pedir confirmação de overwrite
+      showConfirmModal.value = true
+      return
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ erro: 'Erro desconhecido' }))
+      throw new Error(err?.erro || 'Falha ao salvar inspeção')
+    }
+    // Sucesso
+    showSaveModal.value = false
+    showConfirmModal.value = false
+    toastTitle.value = 'Sucesso'
+    toastMsg.value = 'Inspeção salva com sucesso'
+    showSuccessToast.value = true
+  } catch (e) {
+    console.error('save inspection error', e)
+    toastTitle.value = 'Erro'
+    toastMsg.value = e?.message || 'Erro ao salvar inspeção'
+    showErrorToast.value = true
+  } finally {
+    saveLoading.value = false
+  }
+}
+
 // Oculta campos binários no painel de JSON
 const jsonReplacer = (key, value) => {
   if (key === 'image_base64' || key === 'final_image') return '[hidden]'
