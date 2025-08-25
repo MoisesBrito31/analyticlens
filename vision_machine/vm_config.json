@@ -122,7 +122,7 @@
     ]
   },
   "source_config": {
-    "type": "pasta",
+    "type": "camera",
     "camera_id": 0,
     "resolution": [
       752,
@@ -137,5 +137,5 @@
     "interval_ms": 2000
   },
   "error_msg": "",
-  "last_saved": "2025-08-24T02:27:16.031356"
+  "last_saved": "2025-08-25T13:38:22.199372"
 }

@@ -6,11 +6,11 @@ Flask==3.0.0
 Flask-CORS==4.0.0
 Flask-SocketIO==5.3.6
 
-# Visão computacional
-opencv-python==4.8.1.78
-opencv-python-headless==4.12.0.88
+# Visão computacional - versões compatíveis com Python 3.11
+opencv-python==4.7.0.72
+opencv-python-headless==4.7.0.72
 numpy==1.24.3
-Pillow==10.0.1
+Pillow==9.5.0
 
 # Processamento assíncrono e WebSocket
 python-socketio==5.10.0
