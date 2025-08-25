@@ -21,99 +21,24 @@
       },
       {
         "ROI": {
-          "h": 300,
-          "w": 300,
-          "x": 0,
-          "y": 10
+          "h": 400,
+          "w": 700,
+          "x": 25,
+          "y": 25
         },
-        "area_max": 1000,
-        "area_min": 100,
-        "blob_count_test": false,
+        "area_max": 100000,
+        "area_min": 0,
+        "blob_count_test": true,
         "id": 2,
         "inspec_pass_fail": true,
         "name": "blob_1",
-        "test_blob_count_max": 5,
-        "test_blob_count_min": 4,
+        "test_blob_count_max": 8,
+        "test_blob_count_min": 8,
         "test_total_area_max": 600,
         "test_total_area_min": 50,
         "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
-        "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
-      },
-      {
-        "ROI": {
-          "h": 300,
-          "w": 300,
-          "x": 0,
-          "y": 10
-        },
-        "area_max": 1000,
-        "area_min": 100,
-        "blob_count_test": false,
-        "id": 3,
-        "inspec_pass_fail": false,
-        "name": "blob_2",
-        "test_blob_count_max": 5,
-        "test_blob_count_min": 4,
-        "test_total_area_max": 2000,
-        "test_total_area_min": 600,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
-        "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
-      },
-      {
-        "ROI": {
-          "h": 300,
-          "w": 300,
-          "x": 0,
-          "y": 10
-        },
-        "area_max": 1000,
-        "area_min": 100,
-        "blob_count_test": true,
-        "id": 4,
-        "inspec_pass_fail": true,
-        "name": "blob_3",
-        "test_blob_count_max": 10000,
-        "test_blob_count_min": 1,
-        "test_total_area_max": 600,
-        "test_total_area_min": 50,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
-        "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
-      },
-      {
-        "ROI": {
-          "h": 480,
-          "w": 752,
-          "x": 0,
-          "y": 0
-        },
-        "area_max": 10000000,
-        "area_min": 100,
-        "blob_count_test": true,
-        "id": 5,
-        "inspec_pass_fail": true,
-        "name": "blob_4",
-        "test_blob_count_max": 10000,
-        "test_blob_count_min": 1,
-        "test_total_area_max": 10000,
-        "test_total_area_min": 50,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
+        "th_min": 60,
+        "total_area_test": false,
         "type": "blob",
         "contour_chain": "TC89_KCOS",
         "approx_epsilon_ratio": 0.003,
@@ -122,20 +47,20 @@
     ]
   },
   "source_config": {
-    "type": "camera",
+    "type": "pasta",
     "camera_id": 0,
     "resolution": [
       752,
       480
     ],
     "fps": 30,
-    "folder_path": "./test_images",
+    "folder_path": "./testblob_images",
     "rtsp_url": ""
   },
   "trigger_config": {
     "type": "continuous",
-    "interval_ms": 2000
+    "interval_ms": 1000
   },
-  "error_msg": "",
-  "last_saved": "2025-08-25T13:38:22.199372"
+  "error_msg": "Erro ao inicializar source de imagem: Não foi possível abrir câmera 0",
+  "last_saved": "2025-08-25T21:04:03.379746"
 }

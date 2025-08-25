@@ -503,14 +503,24 @@ class TestModeProcessor:
 
                 # Incluir imagem atual em JPEG base64 (uma vez por atualização)
                 try:
-                    if self.last_frame is not None:
+                    image_to_send = None
+                    # Preferir a imagem final processada quando disponível
+                    if 'inspection_result' in result:
+                        final_image = result['inspection_result'].get('final_image')
+                        if isinstance(final_image, np.ndarray):
+                            image_to_send = final_image
+                    # Fallback para último frame bruto
+                    if image_to_send is None and self.last_frame is not None:
+                        image_to_send = self.last_frame
+
+                    if image_to_send is not None:
                         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
-                        ok, jpeg_buf = cv2.imencode('.jpg', self.last_frame, encode_param)
+                        ok, jpeg_buf = cv2.imencode('.jpg', image_to_send, encode_param)
                         if ok:
                             jpeg_bytes = jpeg_buf.tobytes()
                             websocket_data['image_base64'] = base64.b64encode(jpeg_bytes).decode('ascii')
                             websocket_data['mime'] = 'image/jpeg'
-                            websocket_data['resolution'] = [int(self.last_frame.shape[1]), int(self.last_frame.shape[0])]
+                            websocket_data['resolution'] = [int(image_to_send.shape[1]), int(image_to_send.shape[0])]
                 except Exception as e:
                     logger.debug(f"Falha ao anexar imagem ao WebSocket: {str(e)}")
                 
