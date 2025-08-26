@@ -5,6 +5,7 @@ import LoginView from '@/views/LoginView.vue'
 import MachinesView from '@/views/MachinesView.vue'
 import MachineDetailView from '@/views/MachineDetailView.vue'
 import InspectionsView from '@/views/InspectionsView.vue'
+import InspectionEditOfflineView from '@/views/InspectionEditOfflineView.vue'
 import ConfigurationsView from '@/views/ConfigurationsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -44,6 +45,12 @@ const router = createRouter({
       path: '/inspections',
       name: 'inspections',
       component: InspectionsView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/inspections/:id/edit',
+      name: 'inspection-edit-offline',
+      component: InspectionEditOfflineView,
       meta: { requiresAuth: true }
     },
     {

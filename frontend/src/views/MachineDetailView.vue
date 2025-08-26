@@ -212,7 +212,16 @@ async function doSaveInspection(overwrite = false) {
     const res = await apiFetch(`/api/vms/${vm.value.id}/inspections/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: saveName.value, overwrite, payload }),
+      body: JSON.stringify({
+        name: saveName.value,
+        overwrite,
+        payload: {
+          ...payload,
+          image_base64: liveFrame.value || payload?.image_base64,
+          mime: liveMime.value || payload?.mime,
+          resolution: Array.isArray(liveResolution.value) && liveResolution.value.length === 2 ? liveResolution.value : payload?.resolution
+        }
+      }),
       okStatuses: [200, 201, 409]
     })
     if (res.status === 409) {

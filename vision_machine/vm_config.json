@@ -7,39 +7,55 @@
   "inspection_config": {
     "tools": [
       {
-        "ROI": {
-          "h": 480,
-          "w": 752,
-          "x": 0,
-          "y": 0
-        },
-        "id": 1,
-        "method": "luminance",
+        "order_index": 0,
         "name": "grayscale_filter",
-        "normalize": false,
-        "type": "grayscale"
+        "type": "grayscale",
+        "ROI": {
+          "x": 0,
+          "y": 0,
+          "w": 752,
+          "h": 480
+        },
+        "inspec_pass_fail": false,
+        "method": "luminance",
+        "normalize": false
       },
       {
+        "order_index": 1,
+        "name": "threshold_3",
+        "type": "threshold",
         "ROI": {
-          "h": 400,
-          "w": 700,
-          "x": 25,
-          "y": 25
+          "x": 0,
+          "y": 0,
+          "w": 752,
+          "h": 480
         },
-        "area_max": 100000,
-        "area_min": 0,
-        "blob_count_test": true,
-        "id": 2,
-        "inspec_pass_fail": true,
-        "name": "blob_1",
-        "test_blob_count_max": 8,
-        "test_blob_count_min": 8,
-        "test_total_area_max": 600,
-        "test_total_area_min": 50,
-        "th_max": 255,
-        "th_min": 60,
-        "total_area_test": false,
+        "inspec_pass_fail": false,
+        "mode": "binary",
+        "th_min": 30,
+        "th_max": 100
+      },
+      {
+        "order_index": 2,
+        "name": "comprimidos",
         "type": "blob",
+        "ROI": {
+          "x": 0,
+          "y": 0,
+          "w": 752,
+          "h": 480
+        },
+        "inspec_pass_fail": true,
+        "th_min": 30,
+        "th_max": 255,
+        "area_min": 0,
+        "area_max": 10000000,
+        "total_area_test": false,
+        "blob_count_test": true,
+        "test_total_area_min": 50,
+        "test_total_area_max": 10000,
+        "test_blob_count_min": 8,
+        "test_blob_count_max": 8,
         "contour_chain": "TC89_KCOS",
         "approx_epsilon_ratio": 0.003,
         "polygon_max_points": 1000
@@ -61,6 +77,6 @@
     "type": "continuous",
     "interval_ms": 1000
   },
-  "error_msg": "Erro ao inicializar source de imagem: Não foi possível abrir câmera 0",
-  "last_saved": "2025-08-25T21:04:03.379746"
+  "error_msg": "",
+  "last_saved": "2025-08-26T01:52:56.839865"
 }

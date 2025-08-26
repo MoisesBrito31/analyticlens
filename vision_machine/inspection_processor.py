@@ -120,8 +120,12 @@ class InspectionProcessor:
                     result['status'] = 'success'
                     result['image_modified'] = False
                 
-                # Armazenar resultado por ID para referências futuras
-                self.results[tool.id] = result
+                # Armazenar resultado por chave estável (fallback para índice quando não houver ID)
+                result_key = tool.id if tool.id is not None else f"idx_{i}"
+                # Garantir que tool_id esteja preenchido no resultado para consumo do frontend
+                if result.get('tool_id') is None:
+                    result['tool_id'] = tool.id if tool.id is not None else i
+                self.results[result_key] = result
                 print(f"    ✅ {tool.name} processado em {result.get('processing_time_ms', 0):.2f}ms")
                 
             except Exception as e:

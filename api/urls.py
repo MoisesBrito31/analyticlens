@@ -8,6 +8,9 @@ from .views import (
     VMAction,
     VMStatusSummary,
     SaveInspection,
+    InspectionsList,
+    InspectionDetail,
+    InspectionUpdateVM,
 )
 
 urlpatterns = [
@@ -34,6 +37,12 @@ urlpatterns = [
     
     # Salvar inspeção a partir da VM
     path('vms/<int:vm_id>/inspections/save', SaveInspection.as_view(), name='save_inspection'),
+    # Listagem de inspeções
+    path('inspections', InspectionsList.as_view(), name='inspections_list'),
+    # Detalhe/edição offline de inspeção
+    path('inspections/<int:insp_id>', InspectionDetail.as_view(), name='inspection_detail'),
+    # Atualizar inspeção na VM (online) a partir de JSON enviado
+    path('inspections/<int:insp_id>/update_vm', InspectionUpdateVM.as_view(), name='inspection_update_vm'),
     
     # Outras rotas da API serão adicionadas gradualmente
 ]

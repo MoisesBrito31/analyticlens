@@ -17,22 +17,12 @@
             <BCardBody class="p-4 p-md-5">
               <BRow>
                 <BCol cols="12">
-                  <BAlert variant="success" show class="mb-4">
-                    <Icon name="info-circle" size="1.2rem" class="me-2" />
-                    <strong>Status:</strong> Sistema de inspeções em desenvolvimento.
-                    Aqui você poderá visualizar, configurar e monitorar todas as inspeções do sistema.
-                  </BAlert>
-                  
-                  <BCard class="border-0 bg-light">
-                    <BCardBody class="text-center py-4 py-md-5">
-                      <Icon name="clipboard-check" size="4rem" class="text-muted mb-3" style="opacity: 0.5;" />
-                      <h5 class="text-muted">Funcionalidade em Desenvolvimento</h5>
-                      <p class="text-muted mb-0">
-                        A funcionalidade de gerenciamento de inspeções será implementada em breve.
-                        Incluirá monitoramento em tempo real, histórico de resultados e configurações avançadas.
-                      </p>
-                    </BCardBody>
-                  </BCard>
+                  <InspectionsTable
+                    :inspections="inspections"
+                    :loading="loading"
+                    @refresh="loadInspections"
+                    @edit-offline="goEditOffline"
+                  />
                 </BCol>
               </BRow>
               
@@ -44,10 +34,7 @@
                       <Icon name="clock" size="1rem" class="me-1" />
                       Última verificação: {{ new Date().toLocaleString('pt-BR') }}
                     </small>
-                    <BButton variant="outline-success" size="sm">
-                      <Icon name="arrow-clockwise" size="1rem" class="me-1" />
-                      Atualizar
-                    </BButton>
+                    <div></div>
                   </div>
                 </BCol>
               </BRow>
@@ -62,6 +49,9 @@
 <script setup>
 import TopMenu from '@/components/TopMenu.vue'
 import Icon from '@/components/Icon.vue'
+import InspectionsTable from '@/components/InspectionsTable.vue'
+import { ref, computed, onMounted } from 'vue'
+import { apiFetch } from '@/utils/http'
 import {
   BContainer,
   BRow,
@@ -70,8 +60,50 @@ import {
   BCardHeader,
   BCardBody,
   BAlert,
-  BButton
+  BButton,
+  BTable
 } from 'bootstrap-vue-3'
+
+// Estado da tabela de inspeções
+const inspections = ref([])
+const loading = ref(false)
+
+const fields = [
+  { key: 'name', label: 'Inspeção' },
+  { key: 'vm_name', label: 'VM' },
+  { key: 'tools', label: 'Ferramentas (nome e tipo)' }
+]
+
+const tableItems = computed(() =>
+  inspections.value.map((insp) => ({
+    name: insp.name || '-',
+    vm_name: insp.vm?.name || insp.vm_name || '-',
+    tools: Array.isArray(insp.tools)
+      ? insp.tools.map(t => `${t.name} (${t.type})`).join(', ')
+      : '-'
+  }))
+)
+
+async function loadInspections() {
+  loading.value = true
+  try {
+    const res = await apiFetch('/api/inspections')
+    const data = await res.json()
+    inspections.value = Array.isArray(data) ? data : (data?.inspections || [])
+  } catch (e) {
+    // Fallback em erro
+    inspections.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadInspections)
+
+function goEditOffline(row) {
+  if (!row || !row.raw?.id) return
+  window.location.href = `/inspections/${row.raw.id}/edit`
+}
 </script>
 
 <style scoped>

@@ -111,6 +111,12 @@ class Inspection(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
 
+    # Imagem de referência: armazenar arquivo e URL/caminho
+    reference_image_path = models.CharField(max_length=500, blank=True, null=True, verbose_name='Caminho da Imagem de Referência')
+    reference_image_mime = models.CharField(max_length=50, blank=True, null=True, verbose_name='MIME da Imagem de Referência')
+    reference_image_width = models.IntegerField(blank=True, null=True, verbose_name='Largura da Imagem de Referência')
+    reference_image_height = models.IntegerField(blank=True, null=True, verbose_name='Altura da Imagem de Referência')
+
     class Meta:
         verbose_name = 'Inspeção'
         verbose_name_plural = 'Inspeções'

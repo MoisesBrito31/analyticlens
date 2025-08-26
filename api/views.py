@@ -30,6 +30,11 @@ from .serializers import (
     SaveInspectionRequestSerializer
 )
 from .protocolo import execute_command, refresh_all_vm_statuses, ProtocoloVM
+from django.conf import settings
+from django.utils.crypto import get_random_string
+from django.utils.text import slugify
+import base64
+import os
 
 
 def home_view(request):
@@ -356,6 +361,70 @@ class SaveInspection(APIView):
             if not insp:
                 insp = Inspection(vm=vm, name=name)
             insp.description = f"Importada da VM {vm.machine_id} em {timezone.now().isoformat()}"
+            # Extrair payload (último JSON do WebSocket ou objeto montado no frontend)
+            payload = data.get('payload') or {}
+            # Tentar preencher imagem de referência a partir do payload
+            # Aceita campos: image_base64/mime/resolution ou final_image como base64
+            ref_b64 = None
+            ref_mime = None
+            ref_w = None
+            ref_h = None
+            if isinstance(payload, dict):
+                # Preferir imagem final processada
+                if isinstance(payload.get('inspection_result'), dict) and isinstance(payload['inspection_result'].get('final_image'), str):
+                    candidate = payload['inspection_result']['final_image']
+                    if candidate and candidate != '[hidden]':
+                        ref_b64 = candidate
+                        ref_mime = payload.get('mime') or 'image/jpeg'
+                # Caso contrário, usar image_base64 do test_result
+                if not ref_b64 and isinstance(payload.get('image_base64'), str):
+                    candidate = payload['image_base64']
+                    # Evitar salvar placeholder oculto
+                    if candidate and candidate != '[hidden]':
+                        ref_b64 = candidate
+                        ref_mime = payload.get('mime') or 'image/jpeg'
+                # Resolução
+                if isinstance(payload.get('resolution'), list) and len(payload['resolution']) == 2:
+                    try:
+                        ref_w = int(payload['resolution'][0])
+                        ref_h = int(payload['resolution'][1])
+                    except Exception:
+                        ref_w, ref_h = None, None
+
+            if ref_b64:
+                # Salvar arquivo em server/media/inspections/<vm_id>/ com nome determinístico por inspeção
+                try:
+                    ext = 'jpg'
+                    if ref_mime and '/' in ref_mime:
+                        ext = ref_mime.split('/')[-1]
+                    subdir = os.path.join('inspections', str(vm.id))
+                    abs_subdir = os.path.join(settings.MEDIA_ROOT, subdir)
+                    os.makedirs(abs_subdir, exist_ok=True)
+                    safe_name = slugify(insp.name) or f"inspection_{insp.id or 'new'}"
+                    filename = f"{safe_name}.{ext}"
+                    file_path = os.path.join(subdir, filename)
+                    abs_path = os.path.join(settings.MEDIA_ROOT, file_path)
+                    # Se já houver uma referência anterior e overwrite for verdadeiro, remover o arquivo antigo
+                    if overwrite and insp.reference_image_path:
+                        old_abs = os.path.join(settings.MEDIA_ROOT, insp.reference_image_path)
+                        if os.path.exists(old_abs):
+                            try:
+                                os.remove(old_abs)
+                            except Exception:
+                                pass
+                    # Decodificar base64 (pode vir com prefixo data:)
+                    b64_data = ref_b64.split(',')[-1]
+                    binary = base64.b64decode(b64_data)
+                    with open(abs_path, 'wb') as f:
+                        f.write(binary)
+                    insp.reference_image_path = file_path
+                    insp.reference_image_mime = ref_mime
+                    insp.reference_image_width = ref_w
+                    insp.reference_image_height = ref_h
+                except Exception:
+                    # Não falha a operação por erro de imagem
+                    insp.reference_image_path = None
+
             insp.save()
 
             # Limpar ferramentas existentes se overwrite
@@ -367,7 +436,6 @@ class SaveInspection(APIView):
             tools_cfg = cfg.get('tools', []) if isinstance(cfg, dict) else []
 
             # Se houver payload com último resultado válido, extrair parâmetros úteis
-            payload = data.get('payload') or {}
             last_tools = []
             if isinstance(payload, dict):
                 # Preferir lista padronizada de resultados 'result'
@@ -495,5 +563,284 @@ class SaveInspection(APIView):
                 'tools_created': len(created)
             }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class InspectionsList(APIView):
+    """Lista inspeções com VM e ferramentas (nome e tipo)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Filtros opcionais: por vm_id ou busca por nome
+            vm_id = request.GET.get('vm_id')
+            search = request.GET.get('search', '').strip()
+
+            qs = Inspection.objects.select_related('vm').prefetch_related('tools')
+            if vm_id:
+                qs = qs.filter(vm_id=vm_id)
+            if search:
+                qs = qs.filter(name__icontains=search)
+
+            inspections = []
+            for insp in qs:
+                tools_list = []
+                for t in insp.tools.all():
+                    tools_list.append({
+                        'id': t.id,
+                        'name': t.name,
+                        'type': t.type,
+                    })
+                inspections.append({
+                    'id': insp.id,
+                    'name': insp.name,
+                    'vm': {
+                        'id': insp.vm.id,
+                        'name': insp.vm.name,
+                    },
+                    'tools': tools_list,
+                    'reference_image_url': (settings.MEDIA_URL + insp.reference_image_path) if insp.reference_image_path else None,
+                    'reference_image_mime': insp.reference_image_mime,
+                    'reference_image_resolution': [insp.reference_image_width, insp.reference_image_height] if (insp.reference_image_width and insp.reference_image_height) else None,
+                    'updated_at': insp.updated_at.isoformat() if insp.updated_at else None,
+                    'created_at': insp.created_at.isoformat() if insp.created_at else None,
+                })
+
+            return Response({'inspections': inspections, 'total_count': len(inspections)}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class InspectionDetail(APIView):
+    """CRUD offline de uma inspeção (sem comunicar com a VM)."""
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, insp_id):
+        try:
+            return Inspection.objects.select_related('vm').get(id=insp_id)
+        except Inspection.DoesNotExist:
+            return None
+
+    def get(self, request, insp_id):
+        insp = self.get_object(insp_id)
+        if not insp:
+            return Response({'erro': 'Inspeção não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        tools = []
+        for t in insp.tools.order_by('order_index', 'id').all():
+            td = {
+                'id': t.id,
+                'name': t.name,
+                'type': t.type,
+                'order_index': t.order_index,
+                'ROI': {'x': t.roi_x, 'y': t.roi_y, 'w': t.roi_w, 'h': t.roi_h},
+                'inspec_pass_fail': t.inspec_pass_fail,
+            }
+            # Enrich with type-specific config
+            if t.type == 'grayscale' and hasattr(t, 'grayscale') and t.grayscale:
+                td.update({
+                    'method': t.grayscale.method,
+                    'normalize': t.grayscale.normalize,
+                })
+            elif t.type == 'blur' and hasattr(t, 'blur') and t.blur:
+                td.update({
+                    'method': t.blur.method,
+                    'ksize': t.blur.ksize,
+                    'sigma': t.blur.sigma,
+                })
+            elif t.type == 'threshold' and hasattr(t, 'threshold') and t.threshold:
+                td.update({
+                    'mode': t.threshold.mode,
+                    'th_min': t.threshold.th_min,
+                    'th_max': t.threshold.th_max,
+                })
+            elif t.type == 'morphology' and hasattr(t, 'morphology') and t.morphology:
+                td.update({
+                    'kernel': t.morphology.kernel,
+                    'open': t.morphology.open,
+                    'close': t.morphology.close,
+                    'shape': t.morphology.shape,
+                })
+            elif t.type == 'blob' and hasattr(t, 'blob') and t.blob:
+                td.update({
+                    'th_min': t.blob.th_min,
+                    'th_max': t.blob.th_max,
+                    'area_min': t.blob.area_min,
+                    'area_max': t.blob.area_max,
+                    'total_area_test': t.blob.total_area_test,
+                    'blob_count_test': t.blob.blob_count_test,
+                    'test_total_area_min': t.blob.test_total_area_min,
+                    'test_total_area_max': t.blob.test_total_area_max,
+                    'test_blob_count_min': t.blob.test_blob_count_min,
+                    'test_blob_count_max': t.blob.test_blob_count_max,
+                    'contour_chain': t.blob.contour_chain,
+                    'approx_epsilon_ratio': t.blob.approx_epsilon_ratio,
+                    'polygon_max_points': t.blob.polygon_max_points,
+                })
+            elif t.type == 'math' and hasattr(t, 'math') and t.math:
+                td.update({
+                    'operation': t.math.operation,
+                    'reference_tool_id': t.math.reference_tool_id,
+                    'custom_formula': t.math.custom_formula,
+                })
+            tools.append(td)
+        return Response({
+            'id': insp.id,
+            'name': insp.name,
+            'description': insp.description,
+            'vm': {'id': insp.vm.id, 'name': insp.vm.name},
+            'reference_image_url': (settings.MEDIA_URL + insp.reference_image_path) if insp.reference_image_path else None,
+            'tools': tools,
+        })
+
+    def put(self, request, insp_id):
+        try:
+            insp = self.get_object(insp_id)
+            if not insp:
+                return Response({'erro': 'Inspeção não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+            body = request.data if isinstance(request.data, dict) else {}
+            name = body.get('name')
+            description = body.get('description')
+            tools = body.get('tools')
+
+            if isinstance(name, str) and name:
+                insp.name = name
+            if isinstance(description, str):
+                insp.description = description
+            insp.save()
+
+            if isinstance(tools, list):
+                # Estratégia simples: substituir conjunto por completo (poderemos otimizar depois)
+                insp.tools.all().delete()
+                kinds = {k.slug: k.id for k in ToolKind.objects.all()}
+                created = 0
+                for idx, t in enumerate(tools):
+                    t_type = str((t.get('type') or '').lower())
+                    t_name = t.get('name') or f'tool_{idx+1}'
+                    t_roi = t.get('ROI') or {}
+                    tool = InspectionTool(
+                        inspection=insp,
+                        order_index=int(t.get('order_index', idx)),
+                        name=t_name,
+                        type=t_type,
+                        roi_x=int(t_roi.get('x', 0) or 0),
+                        roi_y=int(t_roi.get('y', 0) or 0),
+                        roi_w=int(t_roi.get('w', 0) or 0),
+                        roi_h=int(t_roi.get('h', 0) or 0),
+                        inspec_pass_fail=bool(t.get('inspec_pass_fail', False)),
+                        tool_kind_id=kinds.get(t_type)
+                    )
+                    tool.save()
+                    created += 1
+
+                    # Criar configs específicas
+                    if t_type == 'grayscale':
+                        GrayscaleTool.objects.create(
+                            tool=tool,
+                            method=str(t.get('method') or 'luminance'),
+                            normalize=bool(t.get('normalize', False))
+                        )
+                    elif t_type == 'blur':
+                        BlurTool.objects.create(
+                            tool=tool,
+                            method=str(t.get('method') or 'gaussian'),
+                            ksize=int(t.get('ksize', 3) or 3),
+                            sigma=float(t.get('sigma', 0.0) or 0.0)
+                        )
+                    elif t_type == 'threshold':
+                        ThresholdTool.objects.create(
+                            tool=tool,
+                            mode=str(t.get('mode') or 'binary'),
+                            th_min=int(t.get('th_min', 0) or 0),
+                            th_max=int(t.get('th_max', 255) or 255)
+                        )
+                    elif t_type == 'morphology':
+                        MorphologyTool.objects.create(
+                            tool=tool,
+                            kernel=int(t.get('kernel', 3) or 3),
+                            open=int(t.get('open', 0) or 0),
+                            close=int(t.get('close', 0) or 0),
+                            shape=str(t.get('shape') or 'ellipse')
+                        )
+                    elif t_type == 'blob':
+                        BlobToolConfig.objects.create(
+                            tool=tool,
+                            th_min=int(t.get('th_min', 0) or 0),
+                            th_max=int(t.get('th_max', 255) or 255),
+                            area_min=float(t.get('area_min', 0.0) or 0.0),
+                            area_max=float(t.get('area_max', 1e12) or 1e12),
+                            total_area_test=bool(t.get('total_area_test', False)),
+                            blob_count_test=bool(t.get('blob_count_test', False)),
+                            test_total_area_min=float(t.get('test_total_area_min', 0.0) or 0.0),
+                            test_total_area_max=float(t.get('test_total_area_max', 1e12) or 1e12),
+                            test_blob_count_min=int(t.get('test_blob_count_min', 0) or 0),
+                            test_blob_count_max=int(t.get('test_blob_count_max', 1_000_000) or 1_000_000),
+                            contour_chain=str(t.get('contour_chain') or 'SIMPLE'),
+                            approx_epsilon_ratio=float(t.get('approx_epsilon_ratio', 0.01) or 0.01),
+                            polygon_max_points=int(t.get('polygon_max_points', 0) or 0)
+                        )
+                    elif t_type == 'math':
+                        # Tenta resolver referência pela ordem/nome já criados
+                        ref_obj = None
+                        ref_id = t.get('reference_tool_id')
+                        ref_name = t.get('reference_tool_name')
+                        if ref_id is not None:
+                            ref_obj = insp.tools.filter(order_index__lt=tool.order_index, id=ref_id).first()
+                        if not ref_obj and ref_name:
+                            ref_obj = insp.tools.filter(order_index__lt=tool.order_index, name=ref_name).first()
+                        MathTool.objects.create(
+                            tool=tool,
+                            operation=str(t.get('operation') or ''),
+                            reference_tool=ref_obj,
+                            custom_formula=str(t.get('custom_formula') or '')
+                        )
+
+            return Response({'success': True})
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def delete(self, request, insp_id):
+        try:
+            insp = self.get_object(insp_id)
+            if not insp:
+                return Response({'erro': 'Inspeção não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+            insp.delete()
+            return Response({'success': True})
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class InspectionUpdateVM(APIView):
+    """Atualiza a inspeção configurada na VM (online) com o JSON fornecido."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, insp_id):
+        try:
+            # body.tools é obrigatório (somente tools para VM)
+            body = request.data if isinstance(request.data, dict) else {}
+            tools = body.get('tools')
+            if not isinstance(tools, list):
+                return Response({'erro': 'Campo tools é obrigatório como lista'}, status=status.HTTP_400_BAD_REQUEST)
+
+            insp = Inspection.objects.select_related('vm').filter(id=insp_id).first()
+            if not insp:
+                return Response({'erro': 'Inspeção não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+            vm = insp.vm
+            # Montar payload de configuração de inspeção conforme VM espera
+            config_payload = {
+                'config': {
+                    'tools': tools
+                }
+            }
+
+            # Enviar para VM via protocolo
+            protocolo = ProtocoloVM()
+            result = protocolo.send_command(vm, 'update_inspection_config', params=config_payload)
+            if not result.get('ok', False):
+                return Response({'erro': result.get('error', 'Falha ao atualizar VM')}, status=status.HTTP_502_BAD_GATEWAY)
+
+            return Response({'success': True})
         except Exception as e:
             return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
