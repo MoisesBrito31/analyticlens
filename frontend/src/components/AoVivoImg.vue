@@ -6,32 +6,41 @@
           <template v-if="imageUrl">
             <img :src="imageUrl" :alt="alt" class="frame" :class="fitClass" />
             <div v-if="hasAnyOverlay" class="overlay">
-              <div v-if="showOverlay" class="roi" :style="roiStyle"></div>
-              <div
-                v-for="(pt, i) in blobCentroidPoints"
-                :key="`bc_${i}`"
-                class="blob-cross"
-                :style="{ left: pt.left, top: pt.top }"
-              ></div>
-              <div
-                v-for="(box, i) in blobBoxes"
-                :key="`bb_${i}`"
-                class="blob-box"
-                :style="box"
-              ></div>
-              <svg v-if="showBlobContours && hasContours" class="contour-svg" :viewBox="svgViewBox" preserveAspectRatio="none">
-                <template v-for="(path, i) in contourPaths" :key="`cp_${i}`">
-                  <path
-                    :d="path"
-                    fill="rgba(25, 135, 84, 0.25)"
-                    stroke="rgba(25, 135, 84, 0.25)"
-                    stroke-width="0.2"
-                    vector-effect="non-scaling-stroke"
-                    stroke-linejoin="round"
-                    stroke-linecap="round"
-                    shape-rendering="geometricPrecision"
-                  />
-                </template>
+              <svg class="contour-svg" :viewBox="svgViewBox" preserveAspectRatio="xMidYMid meet">
+                <!-- ROI retângulo -->
+                <rect v-if="showRectOverlay"
+                  :x="effectiveRoiRect?.x || 0" :y="effectiveRoiRect?.y || 0"
+                  :width="effectiveRoiRect?.w || 0" :height="effectiveRoiRect?.h || 0"
+                  fill="rgba(13,110,253,0.15)" stroke="#0d6efd" stroke-width="2" vector-effect="non-scaling-stroke" />
+                <!-- ROI círculo -->
+                <circle v-if="showCircleOverlay" :cx="roiCircle.cx" :cy="roiCircle.cy" :r="roiCircle.r"
+                  fill="rgba(13,110,253,0.15)" stroke="#0d6efd" stroke-width="2" vector-effect="non-scaling-stroke" />
+                <!-- ROI elipse -->
+                <g v-if="showEllipseOverlay" :transform="`rotate(${roiEllipse.angle} ${roiEllipse.cx} ${roiEllipse.cy})`">
+                  <ellipse :cx="roiEllipse.cx" :cy="roiEllipse.cy" :rx="roiEllipse.rx" :ry="roiEllipse.ry"
+                    fill="rgba(13,110,253,0.15)" stroke="#0d6efd" stroke-width="2" vector-effect="non-scaling-stroke" />
+                </g>
+
+                <!-- Blobs: centróides -->
+                <g v-if="showBlobCentroids">
+                  <g v-for="(pt, i) in blobCentroidPointsPx" :key="`bc_${i}`" :stroke="analysisColors.strokeStrong" stroke-width="2" vector-effect="non-scaling-stroke">
+                    <line :x1="pt.x - 6" :y1="pt.y" :x2="pt.x + 6" :y2="pt.y" />
+                    <line :x1="pt.x" :y1="pt.y - 6" :x2="pt.x" :y2="pt.y + 6" />
+                  </g>
+                </g>
+
+                <!-- Blobs: caixas -->
+                <g v-if="showBlobBoxes">
+                  <rect v-for="(bb, i) in blobBoxesPx" :key="`bb_${i}`" :x="bb.x" :y="bb.y" :width="bb.w" :height="bb.h"
+                    fill="none" :stroke="analysisColors.strokeMed" stroke-width="2" vector-effect="non-scaling-stroke" />
+                </g>
+
+                <!-- Blobs: contornos -->
+                <g v-if="showBlobContours && hasContours">
+                  <template v-for="(path, i) in contourPaths" :key="`cp_${i}`">
+                    <path :d="path" :fill="analysisColors.fillContour" :stroke="analysisColors.fillContour" stroke-width="0.8" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" shape-rendering="geometricPrecision" />
+                  </template>
+                </g>
               </svg>
             </div>
           </template>
@@ -182,6 +191,29 @@
               <button type="button" class="toggle-btn" :class="{ active: showBlobBoxes }" @click="toggleBlobBoxes">Blobs: áreas</button>
               <button type="button" class="toggle-btn" :class="{ active: showBlobContours }" @click="toggleBlobContours">Blobs: contornos</button>
             </div>
+            <!-- Tabela de blobs: centroide e área -->
+            <div v-if="selectedItem && (selectedItem.tool_type === 'blob' || selectedItem.type === 'blob')" class="mb-2">
+              <h6 class="section-subtitle">Blobs</h6>
+              <div v-if="blobAnalysisRows.length === 0" class="text-muted small">Sem blobs.</div>
+              <div v-else class="card-like">
+                <table class="blob-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px">#</th>
+                      <th>Centroide (x, y)</th>
+                      <th style="width: 140px">Área</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in blobAnalysisRows" :key="`br_${row.index}`">
+                      <td>{{ row.index }}</td>
+                      <td>{{ row.cx }}, {{ row.cy }}</td>
+                      <td>{{ formatNumber(row.area) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <FormKit type="form" :actions="false" disabled>
               <div class="form-section">
                 <div v-if="analysisEntries.length === 0" class="text-muted small">Sem dados de análise.</div>
@@ -278,6 +310,7 @@ const imageUrl = ref('')
 let objectUrl = ''
 const selectedIndex = ref(-1)
 const selectedRoi = ref(null)
+const selectedRoiShape = ref(null)
 const hasAutoSelected = ref(false)
 
 const aspectRatio = computed(() => {
@@ -300,23 +333,16 @@ const baseHeight = computed(() => Array.isArray(props.resolution) ? Number(props
 
 const svgViewBox = computed(() => `0 0 ${baseWidth.value || 100} ${baseHeight.value || 100}`)
 
-const showOverlay = computed(() => !!(selectedRoi.value && baseWidth.value > 0 && baseHeight.value > 0 && imageUrl.value))
-const hasAnyOverlay = computed(() => showOverlay.value || (blobCentroidPoints.value && blobCentroidPoints.value.length > 0) || (blobBoxes.value && blobBoxes.value.length > 0))
-
-const roiStyle = computed(() => {
-  if (!showOverlay.value) return {}
-  const { x = 0, y = 0, w = 0, h = 0 } = selectedRoi.value || {}
-  const left = (x / baseWidth.value) * 100
-  const top = (y / baseHeight.value) * 100
-  const width = (w / baseWidth.value) * 100
-  const height = (h / baseHeight.value) * 100
-  return {
-    left: `${left}%`,
-    top: `${top}%`,
-    width: `${width}%`,
-    height: `${height}%`
-  }
+const showRectOverlay = computed(() => {
+  if (!(effectiveRoiRect.value && baseWidth.value > 0 && baseHeight.value > 0 && imageUrl.value)) return false
+  const s = selectedRoiShape.value
+  // Só exibe retângulo quando o shape é retângulo (ou legacy sem shape)
+  if (!s || s.shape === 'rect') return true
+  return false
 })
+const hasAnyOverlay = computed(() => showRectOverlay.value || showCircleOverlay.value || showEllipseOverlay.value || (blobCentroidPointsPx.value && blobCentroidPointsPx.value.length > 0) || (blobBoxesPx.value && blobBoxesPx.value.length > 0))
+
+// Não usamos mais CSS percent para ROI; tudo em SVG coordenado pela resolução
 
 function revokeObjectUrl() {
   if (objectUrl) {
@@ -398,6 +424,36 @@ function normalizeRoi(roiLike) {
   return { x, y, w, h }
 }
 
+function extractRoiShape(obj) {
+  if (!obj || typeof obj !== 'object') return null
+  const roi = obj.ROI || obj.roi
+  if (!roi || typeof roi !== 'object') return null
+  // Novo formato tipado
+  if (typeof roi.shape === 'string') {
+    const shape = roi.shape
+    if (shape === 'rect') {
+      const r = roi.rect || roi
+      const rect = normalizeRoi(r)
+      return rect ? { shape: 'rect', rect } : null
+    }
+    if (shape === 'circle' && roi.circle) {
+      const cx = Number(roi.circle.cx), cy = Number(roi.circle.cy), r = Number(roi.circle.r)
+      if ([cx, cy, r].every(isFinite) && r > 0) return { shape: 'circle', circle: { cx, cy, r } }
+      return null
+    }
+    if (shape === 'ellipse' && roi.ellipse) {
+      const cx = Number(roi.ellipse.cx), cy = Number(roi.ellipse.cy)
+      const rx = Number(roi.ellipse.rx), ry = Number(roi.ellipse.ry)
+      const angle = Number(roi.ellipse.angle || 0)
+      if ([cx, cy, rx, ry].every(isFinite) && rx > 0 && ry > 0) return { shape: 'ellipse', ellipse: { cx, cy, rx, ry, angle } }
+      return null
+    }
+  }
+  // Legacy {x,y,w,h}
+  const rect = normalizeRoi(roi)
+  return rect ? { shape: 'rect', rect } : null
+}
+
 function itemKey(item, idx) {
   const base = String(item?.id ?? item?.name ?? item?.type ?? '')
   return base || `idx_${idx}`
@@ -422,18 +478,22 @@ function extractRoi(item) {
 }
 
 function findToolDefForItem(item) {
-  if (!item || !Array.isArray(props.toolDefs)) return null
-  const tid = item.tool_id ?? item.id
-  const tname = item.tool_name ?? item.name
-  // Tenta casar por id, depois por nome, por fim por tipo + ordem
-  let def = null
-  if (tid != null) def = props.toolDefs.find(t => t.id === tid)
-  if (!def && tname) def = props.toolDefs.find(t => t.name === tname)
-  if (!def && item?.tool_type) {
-    const defsOfType = props.toolDefs.filter(t => t.type === item.tool_type)
-    def = defsOfType[0] || null
+  if (!item) return null
+  const byIdOrName = (arr) => {
+    if (!Array.isArray(arr)) return null
+    const tid = item.tool_id ?? item.id
+    const tname = item.tool_name ?? item.name
+    let def = null
+    if (tid != null) def = arr.find(t => t.id === tid)
+    if (!def && tname) def = arr.find(t => t.name === tname)
+    if (!def && (item?.tool_type || item?.type)) {
+      const ty = item.tool_type || item.type
+      def = arr.find(t => t.type === ty) || null
+    }
+    return def || null
   }
-  return def || null
+  // Prioriza props.tools (definições carregadas), depois toolDefs
+  return byIdOrName(props.tools) || byIdOrName(props.toolDefs)
 }
 
 function extractPassFail(item) {
@@ -456,18 +516,23 @@ function extractPassFail(item) {
 
 function handleItemClick(item, idx) {
   let roi = extractRoi(item)
+  let roiShape = extractRoiShape(item)
   if (!roi) {
     const def = findToolDefForItem(item)
-    roi = extractRoi(def)
+    // Se o item já for uma definição (tem ROI shape), usa diretamente
+    roi = extractRoi(def) || extractRoi(item)
+    if (!roiShape) roiShape = extractRoiShape(def) || extractRoiShape(item)
   }
   if (selectedIndex.value === idx) {
     // Toggle off
     selectedIndex.value = -1
     selectedRoi.value = null
+    selectedRoiShape.value = null
     emit('select', null)
   } else {
     selectedIndex.value = idx
     selectedRoi.value = roi || null
+    selectedRoiShape.value = roiShape || (roi ? { shape: 'rect', rect: roi } : null)
     emit('select', {
       index: idx,
       item,
@@ -488,7 +553,10 @@ watch([() => props.results, () => props.tools], ([resultsList, toolsList]) => {
   if (Array.isArray(src) && src.length > 0) {
     const first = src[0]
     selectedIndex.value = 0
-    selectedRoi.value = extractRoi(first)
+    const roi = extractRoi(first)
+    const roiShape = extractRoiShape(first)
+    selectedRoi.value = roi || null
+    selectedRoiShape.value = roiShape || (roi ? { shape: 'rect', rect: roi } : null)
     hasAutoSelected.value = true
   }
 }, { immediate: true })
@@ -507,6 +575,52 @@ function statusClass(item) {
 const selectedItem = computed(() => {
   if (selectedIndex.value < 0) return null
   return displayItems.value[selectedIndex.value] || null
+})
+
+// Bounding box efetivo (para offsets dos blobs) baseado em ROI retângulo ou shape
+const effectiveRoiRect = computed(() => {
+  if (selectedRoi.value && typeof selectedRoi.value === 'object') return selectedRoi.value
+  const s = selectedRoiShape.value
+  if (!s || typeof s !== 'object') return null
+  if (s.shape === 'rect' && s.rect) return s.rect
+  if (s.shape === 'circle' && s.circle) {
+    const { cx, cy, r } = s.circle
+    return { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r }
+  }
+  if (s.shape === 'ellipse' && s.ellipse) {
+    const { cx, cy, rx, ry } = s.ellipse
+    return { x: cx - rx, y: cy - ry, w: 2 * rx, h: 2 * ry }
+    
+  }
+  return null
+})
+
+// ROI overlay shapes
+const showCircleOverlay = computed(() => !!(selectedRoiShape.value && selectedRoiShape.value.shape === 'circle' && baseWidth.value > 0 && baseHeight.value > 0 && imageUrl.value))
+const showEllipseOverlay = computed(() => !!(selectedRoiShape.value && selectedRoiShape.value.shape === 'ellipse' && baseWidth.value > 0 && baseHeight.value > 0 && imageUrl.value))
+
+const roiCircle = computed(() => {
+  if (!showCircleOverlay.value) return { cx: 0, cy: 0, r: 0 }
+  const s = selectedRoiShape.value
+  // Alguns resultados podem vir com bounding box apenas; se houver, usa-o para derivar cx,cy,r
+  if (s.circle) {
+    const { cx, cy, r } = s.circle
+    return { cx, cy, r }
+  }
+  const r = effectiveRoiRect.value
+  if (r) {
+    const cx = r.x + r.w / 2
+    const cy = r.y + r.h / 2
+    const rad = Math.min(r.w, r.h) / 2
+    return { cx, cy, r: rad }
+  }
+  return { cx: 0, cy: 0, r: 0 }
+})
+
+const roiEllipse = computed(() => {
+  if (!showEllipseOverlay.value) return { cx: 0, cy: 0, rx: 0, ry: 0, angle: 0 }
+  const { cx, cy, rx, ry, angle = 0 } = selectedRoiShape.value.ellipse
+  return { cx, cy, rx, ry, angle }
 })
 
 function formatJson(obj) {
@@ -597,7 +711,7 @@ const analysisEntries = computed(() => {
   if (!it || typeof it !== 'object') return []
   const exclude = new Set([
     'tool_id','tool_name','tool_type','status','image_modified','processing_time_ms',
-    'pass_fail','error','ROI','roi','rect','bbox','test_results','tests','test'
+    'pass_fail','error','ROI','roi','rect','bbox','test_results','tests','test','blobs'
   ])
   const preferredOrder = ['blob_count', 'total_area', 'roi_area']
   const added = new Set()
@@ -622,15 +736,13 @@ function toggleBlobCentroids() {
 }
 
 // Pontos de centróide dos blobs na imagem, em porcentagem relativa ao frame completo
-const blobCentroidPoints = computed(() => {
+const blobCentroidPointsPx = computed(() => {
   if (!showBlobCentroids.value) return []
   const it = selectedItem.value
   if (!it || typeof it !== 'object') return []
-  // blobs podem estar em `blobs` (cada item contém centroid [x,y])
   const blobs = Array.isArray(it.blobs) ? it.blobs : []
   if (!blobs.length || baseWidth.value <= 0 || baseHeight.value <= 0) return []
-  // Converter coordenadas do ROI para coordenadas globais se ROI estiver presente
-  const roi = extractRoi(it) || selectedRoi.value
+  const roi = extractRoi(it) || effectiveRoiRect.value
   const roiX = roi?.x || 0
   const roiY = roi?.y || 0
   return blobs
@@ -640,9 +752,7 @@ const blobCentroidPoints = computed(() => {
       const absX = roiX + Number(c[0] || 0)
       const absY = roiY + Number(c[1] || 0)
       if (!isFinite(absX) || !isFinite(absY)) return null
-      const left = (absX / baseWidth.value) * 100
-      const top = (absY / baseHeight.value) * 100
-      return { left: `${left}%`, top: `${top}%` }
+      return { x: absX, y: absY }
     })
     .filter(Boolean)
 })
@@ -653,13 +763,13 @@ function toggleBlobBoxes() {
   showBlobBoxes.value = !showBlobBoxes.value
 }
 
-const blobBoxes = computed(() => {
+const blobBoxesPx = computed(() => {
   if (!showBlobBoxes.value) return []
   const it = selectedItem.value
   if (!it || typeof it !== 'object') return []
   const blobs = Array.isArray(it.blobs) ? it.blobs : []
   if (!blobs.length || baseWidth.value <= 0 || baseHeight.value <= 0) return []
-  const roi = extractRoi(it) || selectedRoi.value
+  const roi = extractRoi(it) || effectiveRoiRect.value
   const roiX = roi?.x || 0
   const roiY = roi?.y || 0
   return blobs
@@ -670,16 +780,7 @@ const blobBoxes = computed(() => {
       if (![x, y, w, h].every(isFinite)) return null
       const absX = roiX + x
       const absY = roiY + y
-      const left = (absX / baseWidth.value) * 100
-      const top = (absY / baseHeight.value) * 100
-      const width = (w / baseWidth.value) * 100
-      const height = (h / baseHeight.value) * 100
-      return {
-        left: `${left}%`,
-        top: `${top}%`,
-        width: `${width}%`,
-        height: `${height}%`
-      }
+      return { x: absX, y: absY, w, h }
     })
     .filter(Boolean)
 })
@@ -702,7 +803,7 @@ const contourPaths = computed(() => {
   if (!it || typeof it !== 'object') return []
   const blobs = Array.isArray(it.blobs) ? it.blobs : []
   if (!blobs.length || baseWidth.value <= 0 || baseHeight.value <= 0) return []
-  const roi = extractRoi(it) || selectedRoi.value
+  const roi = extractRoi(it) || effectiveRoiRect.value
   const roiX = roi?.x || 0
   const roiY = roi?.y || 0
   // Usar coordenadas no espaço de pixels da imagem (viewBox = resolução real)
@@ -721,6 +822,23 @@ const contourPaths = computed(() => {
   return blobs
     .map(b => Array.isArray(b.contour) ? toPath(b.contour) : '')
     .filter(p => p)
+})
+
+// Linhas para tabela de análise de blobs
+const blobAnalysisRows = computed(() => {
+  const it = selectedItem.value
+  if (!it || typeof it !== 'object') return []
+  const blobs = Array.isArray(it.blobs) ? it.blobs : []
+  return blobs.map((b, idx) => {
+    const c = Array.isArray(b.centroid) ? b.centroid : [0, 0]
+    const area = Number(b.area || 0)
+    return {
+      index: idx + 1,
+      cx: Number(c[0] || 0),
+      cy: Number(c[1] || 0),
+      area
+    }
+  })
 })
 
 function labelize(key) {
@@ -748,6 +866,14 @@ function formatValue(val) {
   if (typeof val === 'number') return String(val)
   if (typeof val === 'string') return val
   return formatJson(val)
+}
+
+// Formatação numérica simples
+function formatNumber(n) {
+  const num = Number(n)
+  if (!isFinite(num)) return '—'
+  if (Math.abs(num) >= 1000) return String(Math.round(num))
+  return num.toFixed(2)
 }
 
 // Organização dos cards de teste
@@ -817,6 +943,18 @@ const statusBadgeClass = computed(() => {
   if (overallPass.value === true) return 'bg-success text-white'
   if (overallPass.value === false) return 'bg-danger text-white'
   return 'bg-secondary text-white'
+})
+
+// Cores reativas para análise (verde se passou, vermelho se falhou)
+const analysisColors = computed(() => {
+  const it = selectedItem.value
+  const pf = it ? (typeof it.pass_fail === 'boolean' ? it.pass_fail : undefined) : undefined
+  const isFail = pf === false
+  return {
+    strokeStrong: isFail ? 'rgba(220, 53, 69, 0.95)' : 'rgba(25, 135, 84, 0.9)', // vermelho forte vs verde
+    strokeMed: isFail ? 'rgba(220, 53, 69, 0.75)' : 'rgba(25, 135, 84, 0.6)',
+    fillContour: isFail ? 'rgba(220, 53, 69, 0.25)' : 'rgba(25, 135, 84, 0.25)'
+  }
 })
 
 // Linha do tempo de resultados (memória temporária em runtime)
@@ -1079,6 +1217,19 @@ const timelineDisplay = computed(() => {
   padding: 10px;
   background: #f8f9fa;
   margin-bottom: 8px;
+}
+
+.blob-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.blob-table th, .blob-table td {
+  border: 1px solid #e9ecef;
+  padding: 6px 8px;
+}
+.blob-table thead th {
+  background: #f1f3f5;
 }
 
 .section-subtitle {

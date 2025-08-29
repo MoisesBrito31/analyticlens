@@ -83,7 +83,7 @@ class InspectionProcessor:
             print(f"  [{i+1}/{len(self.tools)}] Processando {tool.name} (ID: {tool.id}, Tipo: {tool.type})")
             
             try:
-                # Extrair ROI
+                # Extrair ROI (retorna também bbox/máscara através de atributos internos do tool)
                 roi_image = tool.extract_roi(current_image)
                 
                 # Verificar se já temos uma imagem processada do tipo necessário
@@ -101,7 +101,8 @@ class InspectionProcessor:
                         processed_images['grayscale'] = processed_image.copy()
                         print(f"    💾 Imagem grayscale armazenada para reutilização")
                     
-                    current_image = self._apply_roi_result(current_image, processed_image, tool.roi)
+                    # Aplica resultado de volta considerando shape/máscara
+                    current_image = self._apply_roi_result(current_image, processed_image, getattr(tool, '_last_roi_bbox', None), getattr(tool, '_last_roi_mask', None))
                     
                     # Adicionar tempo de processamento
                     result = {
@@ -146,30 +147,39 @@ class InspectionProcessor:
         # Resultado final da inspeção
         return self._generate_final_result(current_image, total_processing_time)
     
-    def _apply_roi_result(self, original_image: np.ndarray, roi_result: np.ndarray, roi: Dict) -> np.ndarray:
-        """Aplica o resultado do ROI de volta à imagem original"""
-        if not roi:
+    def _apply_roi_result(self, original_image: np.ndarray, roi_result: np.ndarray, bbox, mask) -> np.ndarray:
+        """Aplica o resultado do ROI de volta à imagem original respeitando máscara (para circle/ellipse)."""
+        if bbox is None:
             return roi_result
-        
-        x, y = roi.get('x', 0), roi.get('y', 0)
-        h, w = roi_result.shape[:2]
-        
+
+        x, y, w, h = bbox
+        if w <= 0 or h <= 0:
+            return original_image
+
         result_image = original_image.copy()
-        
-        # Verificar se as dimensões são compatíveis
+
+        # Compatibiliza canais
         if len(original_image.shape) == 3 and len(roi_result.shape) == 2:
-            # Se a imagem original é RGB/BGR e o ROI é grayscale, converter para 3 canais
             roi_result = cv2.cvtColor(roi_result, cv2.COLOR_GRAY2BGR)
         elif len(original_image.shape) == 2 and len(roi_result.shape) == 3:
-            # Se a imagem original é grayscale e o ROI é RGB/BGR, converter para 1 canal
             roi_result = cv2.cvtColor(roi_result, cv2.COLOR_BGR2GRAY)
-        
-        # Verificar se as dimensões do ROI result cabem na imagem original
+
         if x + w <= original_image.shape[1] and y + h <= original_image.shape[0]:
-            result_image[y:y+h, x:x+w] = roi_result
+            if mask is None:
+                # retângulo puro
+                result_image[y:y+h, x:x+w] = roi_result
+            else:
+                # aplica somente onde mask > 0
+                sub = result_image[y:y+h, x:x+w]
+                if len(sub.shape) == 3:
+                    mask3 = cv2.merge([mask, mask, mask])
+                    np.copyto(sub, roi_result, where=mask3.astype(bool))
+                else:
+                    np.copyto(sub, roi_result, where=mask.astype(bool))
+                result_image[y:y+h, x:x+w] = sub
         else:
             print(f"⚠️ ROI result ({w}x{h}) não cabe na posição ({x},{y}) da imagem original {original_image.shape}")
-        
+
         return result_image
     
     def _generate_final_result(self, final_image: np.ndarray, total_time: float) -> Dict[str, Any]:

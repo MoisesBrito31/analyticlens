@@ -31,32 +31,102 @@ class BaseTool(ABC):
             return None
     
     def extract_roi(self, image: np.ndarray) -> np.ndarray:
-        """Extrai região de interesse"""
+        """Extrai região de interesse (ROI). Suporta rect (legacy), circle e ellipse via máscara."""
         if not self.roi:
+            # Nenhum ROI: a ferramenta trabalha a imagem inteira
+            self._last_roi_bbox = (0, 0, image.shape[1], image.shape[0])
+            self._last_roi_mask = None
             return image
-        
-        # Obter dimensões da imagem
+
         img_height, img_width = image.shape[:2]
-        
-        x, y = self.roi.get('x', 0), self.roi.get('y', 0)
-        w, h = self.roi.get('w', img_width), self.roi.get('h', img_height)
-        
-        # Validação e correção de ROI
-        x = max(0, min(x, img_width - 1))
-        y = max(0, min(y, img_height - 1))
-        w = min(w, img_width - x)
-        h = min(h, img_height - y)
-        
-        # Verificar se o ROI é válido
-        if w <= 0 or h <= 0:
-            print(f"⚠️ ROI inválido para {self.name}: ({x},{y},{w},{h}) em imagem {img_width}x{img_height}")
-            return image
-        
-        # Extrair ROI
-        roi_image = image[y:y+h, x:x+w]
-        
-        print(f"🔍 {self.name}: ROI extraído ({x},{y},{w},{h}) -> {roi_image.shape}")
-        
+
+        # Back-compat: se vier no formato antigo, tratar como retângulo
+        is_legacy_rect = all(k in self.roi for k in ('x', 'y', 'w', 'h')) and 'shape' not in self.roi
+        shape = self.roi.get('shape', 'rect' if is_legacy_rect else self.roi.get('shape', 'rect'))
+
+        # Funções auxiliares
+        def clamp_bbox(x: int, y: int, w: int, h: int):
+            x = max(0, min(x, img_width - 1))
+            y = max(0, min(y, img_height - 1))
+            w = max(0, min(w, img_width - x))
+            h = max(0, min(h, img_height - y))
+            return x, y, w, h
+
+        mask = None
+        if shape == 'rect':
+            # Pode vir como ROI antigo ({x,y,w,h}) ou aninhado em roi['rect']
+            r = self.roi.get('rect', self.roi)
+            x, y = int(r.get('x', 0)), int(r.get('y', 0))
+            w, h = int(r.get('w', img_width)), int(r.get('h', img_height))
+            x, y, w, h = clamp_bbox(x, y, w, h)
+            if w <= 0 or h <= 0:
+                print(f"⚠️ ROI inválido para {self.name}: ({x},{y},{w},{h}) em imagem {img_width}x{img_height}")
+                self._last_roi_bbox = (0, 0, 0, 0)
+                self._last_roi_mask = None
+                return image
+            roi_image = image[y:y+h, x:x+w]
+            mask = np.ones((h, w), dtype=np.uint8) * 255
+
+        elif shape == 'circle':
+            c = self.roi.get('circle', {})
+            cx, cy = int(c.get('cx', 0)), int(c.get('cy', 0))
+            r = int(c.get('r', 0))
+            if r <= 0:
+                print(f"⚠️ ROI círculo inválido para {self.name}: (cx={cx}, cy={cy}, r={r})")
+                self._last_roi_bbox = (0, 0, 0, 0)
+                self._last_roi_mask = None
+                return image
+            x, y = cx - r, cy - r
+            w, h = 2 * r, 2 * r
+            x, y, w, h = clamp_bbox(x, y, w, h)
+            if w <= 0 or h <= 0:
+                print(f"⚠️ ROI círculo fora dos limites para {self.name}")
+                self._last_roi_bbox = (0, 0, 0, 0)
+                self._last_roi_mask = None
+                return image
+            roi_image = image[y:y+h, x:x+w]
+            mask = np.zeros((h, w), dtype=np.uint8)
+            # centro relativo após clamp
+            rel_cx = min(max(r, 0), w - 1)
+            rel_cy = min(max(r, 0), h - 1)
+            cv2.circle(mask, (rel_cx, rel_cy), min(r, w - 1, h - 1), 255, -1)
+
+        elif shape == 'ellipse':
+            e = self.roi.get('ellipse', {})
+            cx, cy = int(e.get('cx', 0)), int(e.get('cy', 0))
+            rx, ry = int(e.get('rx', 0)), int(e.get('ry', 0))
+            angle = float(e.get('angle', 0.0))
+            if rx <= 0 or ry <= 0:
+                print(f"⚠️ ROI elipse inválido para {self.name}: (cx={cx}, cy={cy}, rx={rx}, ry={ry})")
+                self._last_roi_bbox = (0, 0, 0, 0)
+                self._last_roi_mask = None
+                return image
+            x, y = cx - rx, cy - ry
+            w, h = 2 * rx, 2 * ry
+            x, y, w, h = clamp_bbox(x, y, w, h)
+            if w <= 0 or h <= 0:
+                print(f"⚠️ ROI elipse fora dos limites para {self.name}")
+                self._last_roi_bbox = (0, 0, 0, 0)
+                self._last_roi_mask = None
+                return image
+            roi_image = image[y:y+h, x:x+w]
+            mask = np.zeros((h, w), dtype=np.uint8)
+            # centro relativo após clamp
+            rel_cx = min(max(rx, 0), w - 1)
+            rel_cy = min(max(ry, 0), h - 1)
+            cv2.ellipse(mask, (rel_cx, rel_cy), (min(rx, w - 1), min(ry, h - 1)), angle, 0, 360, 255, -1)
+
+        else:
+            # Desconhecido: cai no comportamento antigo, evitando quebra
+            x, y = int(self.roi.get('x', 0)), int(self.roi.get('y', 0))
+            w, h = int(self.roi.get('w', img_width)), int(self.roi.get('h', img_height))
+            x, y, w, h = clamp_bbox(x, y, w, h)
+            roi_image = image[y:y+h, x:x+w]
+            mask = np.ones((h, w), dtype=np.uint8) * 255
+
+        self._last_roi_bbox = (x, y, w, h)
+        self._last_roi_mask = mask
+        print(f"🔍 {self.name}: ROI extraído shape={shape} bbox=({x},{y},{w},{h}) -> {roi_image.shape}")
         return roi_image
     
     def is_filter_tool(self) -> bool:

@@ -40,8 +40,26 @@ class BlobTool(BaseTool):
                 gray_image = roi_image
                 print(f"    ✅ {self.name}: Imagem recebida em grayscale (otimizado)")
             
+            # Aplicar máscara de ROI (quando disponível) ANTES do threshold, para eliminar áreas fora do shape
+            roi_mask = getattr(self, '_last_roi_mask', None)
+            if roi_mask is not None:
+                try:
+                    # Garantir máscara uint8
+                    if roi_mask.dtype != np.uint8:
+                        roi_mask = roi_mask.astype(np.uint8)
+                    gray_image = cv2.bitwise_and(gray_image, gray_image, mask=roi_mask)
+                except Exception:
+                    pass
+
             # Aplicar threshold simples (análise interna, não altera imagem base do pipeline)
             _, binary = cv2.threshold(gray_image, self.th_min, self.th_max, cv2.THRESH_BINARY)
+
+            # Aplicar máscara DEPOIS do threshold também, garantindo que contornos fiquem restritos ao shape
+            if roi_mask is not None:
+                try:
+                    binary = cv2.bitwise_and(binary, binary, mask=roi_mask)
+                except Exception:
+                    pass
             
             # Encontrar contornos
             contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, self._chain_mode())

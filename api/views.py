@@ -34,6 +34,8 @@ from django.conf import settings
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 import base64
+import shutil
+import mimetypes
 import os
 
 
@@ -391,27 +393,28 @@ class SaveInspection(APIView):
                     except Exception:
                         ref_w, ref_h = None, None
 
-            if ref_b64:
-                # Salvar arquivo em server/media/inspections/<vm_id>/ com nome determinístico por inspeção
-                try:
+            # Salvar arquivo em server/media/inspections/<vm_id>/ com nome determinístico por inspeção
+            try:
+                subdir = os.path.join('inspections', str(vm.id))
+                abs_subdir = os.path.join(settings.MEDIA_ROOT, subdir)
+                os.makedirs(abs_subdir, exist_ok=True)
+                safe_name = slugify(insp.name) or f"inspection_{insp.id or 'new'}"
+                # Se já houver uma referência anterior e overwrite for verdadeiro, remover o arquivo antigo
+                if overwrite and insp.reference_image_path:
+                    old_abs = os.path.join(settings.MEDIA_ROOT, insp.reference_image_path)
+                    if os.path.exists(old_abs):
+                        try:
+                            os.remove(old_abs)
+                        except Exception:
+                            pass
+
+                if ref_b64:
                     ext = 'jpg'
                     if ref_mime and '/' in ref_mime:
                         ext = ref_mime.split('/')[-1]
-                    subdir = os.path.join('inspections', str(vm.id))
-                    abs_subdir = os.path.join(settings.MEDIA_ROOT, subdir)
-                    os.makedirs(abs_subdir, exist_ok=True)
-                    safe_name = slugify(insp.name) or f"inspection_{insp.id or 'new'}"
                     filename = f"{safe_name}.{ext}"
                     file_path = os.path.join(subdir, filename)
                     abs_path = os.path.join(settings.MEDIA_ROOT, file_path)
-                    # Se já houver uma referência anterior e overwrite for verdadeiro, remover o arquivo antigo
-                    if overwrite and insp.reference_image_path:
-                        old_abs = os.path.join(settings.MEDIA_ROOT, insp.reference_image_path)
-                        if os.path.exists(old_abs):
-                            try:
-                                os.remove(old_abs)
-                            except Exception:
-                                pass
                     # Decodificar base64 (pode vir com prefixo data:)
                     b64_data = ref_b64.split(',')[-1]
                     binary = base64.b64decode(b64_data)
@@ -421,9 +424,34 @@ class SaveInspection(APIView):
                     insp.reference_image_mime = ref_mime
                     insp.reference_image_width = ref_w
                     insp.reference_image_height = ref_h
-                except Exception:
-                    # Não falha a operação por erro de imagem
-                    insp.reference_image_path = None
+                else:
+                    # Tentar copiar arquivo existente se referência por URL/path for fornecida
+                    src_url = None
+                    if isinstance(payload.get('reference_image_path'), str):
+                        src_url = payload.get('reference_image_path')
+                    elif isinstance(payload.get('reference_image_url'), str):
+                        src_url = payload.get('reference_image_url')
+                    if src_url:
+                        rel = str(src_url)
+                        # Remover prefixo MEDIA_URL ou '/media/' para obter caminho relativo
+                        if settings.MEDIA_URL and rel.startswith(settings.MEDIA_URL):
+                            rel = rel[len(settings.MEDIA_URL):]
+                        rel = rel.replace('/media/', '')
+                        src_abs = os.path.join(settings.MEDIA_ROOT, rel)
+                        if os.path.exists(src_abs):
+                            ext = os.path.splitext(src_abs)[1].lstrip('.') or 'jpg'
+                            guessed_mime, _ = mimetypes.guess_type(src_abs)
+                            filename = f"{safe_name}.{ext}"
+                            file_path = os.path.join(subdir, filename)
+                            abs_path = os.path.join(settings.MEDIA_ROOT, file_path)
+                            shutil.copyfile(src_abs, abs_path)
+                            insp.reference_image_path = file_path
+                            insp.reference_image_mime = guessed_mime or ref_mime or 'image/jpeg'
+                            # Dimensões podem não estar disponíveis; manter as existentes se houver
+                
+            except Exception:
+                # Não falha a operação por erro de imagem
+                insp.reference_image_path = None
 
             insp.save()
 
@@ -473,18 +501,65 @@ class SaveInspection(APIView):
                 t_type = str((t.get('type') or t.get('tool_type') or '')).lower()
                 t_name = t.get('name') or t.get('tool_name') or f"tool_{idx+1}"
                 t_roi = t.get('ROI') or t.get('roi') or {}
+                # Inferir shape quando ausente, mas com chaves circle/ellipse/rect
+                if isinstance(t_roi, dict) and 'shape' not in t_roi:
+                    if 'circle' in t_roi: t_roi['shape'] = 'circle'
+                    elif 'ellipse' in t_roi: t_roi['shape'] = 'ellipse'
+                    elif 'rect' in t_roi or all(k in t_roi for k in ('x','y','w','h')): t_roi['shape'] = 'rect'
+                t_roi = t.get('ROI') or t.get('roi') or {}
+                if isinstance(t_roi, dict) and 'shape' not in t_roi:
+                    if 'circle' in t_roi: t_roi['shape'] = 'circle'
+                    elif 'ellipse' in t_roi: t_roi['shape'] = 'ellipse'
+                    elif 'rect' in t_roi or all(k in t_roi for k in ('x','y','w','h')): t_roi['shape'] = 'rect'
+                # Normaliza ROI para shape + bbox
+                bx = int(t_roi.get('x', 0) or 0)
+                by = int(t_roi.get('y', 0) or 0)
+                bw = int(t_roi.get('w', 0) or 0)
+                bh = int(t_roi.get('h', 0) or 0)
+                roi_shape_json = {}
+                if isinstance(t_roi, dict) and (t_roi.get('shape') or t_roi.get('rect') or t_roi.get('circle') or t_roi.get('ellipse')):
+                    shape = t_roi.get('shape', 'rect')
+                    if shape == 'rect':
+                        r = t_roi.get('rect', t_roi)
+                        bx = int(r.get('x', bx) or bx)
+                        by = int(r.get('y', by) or by)
+                        bw = int(r.get('w', bw) or bw)
+                        bh = int(r.get('h', bh) or bh)
+                        roi_shape_json = {'shape': 'rect', 'rect': {'x': bx, 'y': by, 'w': bw, 'h': bh}}
+                    elif shape == 'circle':
+                        c = t_roi.get('circle', {})
+                        cx = int(c.get('cx', 0) or 0)
+                        cy = int(c.get('cy', 0) or 0)
+                        rr = int(c.get('r', 0) or 0)
+                        bx, by, bw, bh = cx - rr, cy - rr, rr * 2, rr * 2
+                        roi_shape_json = {'shape': 'circle', 'circle': {'cx': cx, 'cy': cy, 'r': rr}}
+                    elif shape == 'ellipse':
+                        e = t_roi.get('ellipse', {})
+                        cx = int(e.get('cx', 0) or 0)
+                        cy = int(e.get('cy', 0) or 0)
+                        rx = int(e.get('rx', 0) or 0)
+                        ry = int(e.get('ry', 0) or 0)
+                        angle = float(e.get('angle', 0.0) or 0.0)
+                        bx, by, bw, bh = cx - rx, cy - ry, rx * 2, ry * 2
+                        roi_shape_json = {'shape': 'ellipse', 'ellipse': {'cx': cx, 'cy': cy, 'rx': rx, 'ry': ry, 'angle': angle}}
+                else:
+                    roi_shape_json = {'shape': 'rect', 'rect': {'x': bx, 'y': by, 'w': bw, 'h': bh}}
                 tool = InspectionTool(
                     inspection=insp,
                     order_index=idx,
                     name=t_name,
                     type=t_type,
-                    roi_x=int(t_roi.get('x', 0) or 0),
-                    roi_y=int(t_roi.get('y', 0) or 0),
-                    roi_w=int(t_roi.get('w', 0) or 0),
-                    roi_h=int(t_roi.get('h', 0) or 0),
+                    roi_x=bx,
+                    roi_y=by,
+                    roi_w=bw,
+                    roi_h=bh,
                     inspec_pass_fail=bool(t.get('inspec_pass_fail', False)),
                     tool_kind_id=kinds.get(t_type)
                 )
+                try:
+                    tool.roi_shape = roi_shape_json
+                except Exception:
+                    pass
                 tool.save()
                 created.append(tool.id)
 
@@ -628,12 +703,18 @@ class InspectionDetail(APIView):
             return Response({'erro': 'Inspeção não encontrada'}, status=status.HTTP_404_NOT_FOUND)
         tools = []
         for t in insp.tools.order_by('order_index', 'id').all():
+            # Preferir ROI com shape salvo; se ausente, usar campos legacy x/y/w/h
+            roi_json = {}
+            try:
+                roi_json = t.roi_shape or {}
+            except Exception:
+                roi_json = {}
             td = {
                 'id': t.id,
                 'name': t.name,
                 'type': t.type,
                 'order_index': t.order_index,
-                'ROI': {'x': t.roi_x, 'y': t.roi_y, 'w': t.roi_w, 'h': t.roi_h},
+                'ROI': roi_json if isinstance(roi_json, dict) and roi_json.get('shape') else {'x': t.roi_x, 'y': t.roi_y, 'w': t.roi_w, 'h': t.roi_h},
                 'inspec_pass_fail': t.inspec_pass_fail,
             }
             # Enrich with type-specific config
@@ -702,12 +783,21 @@ class InspectionDetail(APIView):
             body = request.data if isinstance(request.data, dict) else {}
             name = body.get('name')
             description = body.get('description')
+            vm_id = body.get('vm_id')
             tools = body.get('tools')
 
             if isinstance(name, str) and name:
                 insp.name = name
             if isinstance(description, str):
                 insp.description = description
+            # Atualizar associação de VM quando solicitado
+            if vm_id is not None:
+                try:
+                    vm_obj = VirtualMachine.objects.filter(id=int(vm_id)).first() if vm_id else None
+                    if vm_obj:
+                        insp.vm = vm_obj
+                except Exception:
+                    pass
             insp.save()
 
             if isinstance(tools, list):
@@ -719,18 +809,56 @@ class InspectionDetail(APIView):
                     t_type = str((t.get('type') or '').lower())
                     t_name = t.get('name') or f'tool_{idx+1}'
                     t_roi = t.get('ROI') or {}
+                    # Normaliza ROI: salva bounding box legacy e JSON completo em roi_shape
+                    bx = int(t_roi.get('x', 0) or 0)
+                    by = int(t_roi.get('y', 0) or 0)
+                    bw = int(t_roi.get('w', 0) or 0)
+                    bh = int(t_roi.get('h', 0) or 0)
+                    roi_shape_json = {}
+                    if isinstance(t_roi, dict) and (t_roi.get('shape') or t_roi.get('rect') or t_roi.get('circle') or t_roi.get('ellipse')):
+                        shape = t_roi.get('shape', 'rect')
+                        if shape == 'rect':
+                            r = t_roi.get('rect', t_roi)
+                            bx = int(r.get('x', bx) or bx)
+                            by = int(r.get('y', by) or by)
+                            bw = int(r.get('w', bw) or bw)
+                            bh = int(r.get('h', bh) or bh)
+                            roi_shape_json = {'shape': 'rect', 'rect': {'x': bx, 'y': by, 'w': bw, 'h': bh}}
+                        elif shape == 'circle':
+                            c = t_roi.get('circle', {})
+                            cx = int(c.get('cx', 0) or 0)
+                            cy = int(c.get('cy', 0) or 0)
+                            rr = int(c.get('r', 0) or 0)
+                            bx, by, bw, bh = cx - rr, cy - rr, rr * 2, rr * 2
+                            roi_shape_json = {'shape': 'circle', 'circle': {'cx': cx, 'cy': cy, 'r': rr}}
+                        elif shape == 'ellipse':
+                            e = t_roi.get('ellipse', {})
+                            cx = int(e.get('cx', 0) or 0)
+                            cy = int(e.get('cy', 0) or 0)
+                            rx = int(e.get('rx', 0) or 0)
+                            ry = int(e.get('ry', 0) or 0)
+                            angle = float(e.get('angle', 0.0) or 0.0)
+                            bx, by, bw, bh = cx - rx, cy - ry, rx * 2, ry * 2
+                            roi_shape_json = {'shape': 'ellipse', 'ellipse': {'cx': cx, 'cy': cy, 'rx': rx, 'ry': ry, 'angle': angle}}
+                    else:
+                        roi_shape_json = {'shape': 'rect', 'rect': {'x': bx, 'y': by, 'w': bw, 'h': bh}}
+
                     tool = InspectionTool(
                         inspection=insp,
                         order_index=int(t.get('order_index', idx)),
                         name=t_name,
                         type=t_type,
-                        roi_x=int(t_roi.get('x', 0) or 0),
-                        roi_y=int(t_roi.get('y', 0) or 0),
-                        roi_w=int(t_roi.get('w', 0) or 0),
-                        roi_h=int(t_roi.get('h', 0) or 0),
+                        roi_x=bx,
+                        roi_y=by,
+                        roi_w=bw,
+                        roi_h=bh,
                         inspec_pass_fail=bool(t.get('inspec_pass_fail', False)),
                         tool_kind_id=kinds.get(t_type)
                     )
+                    try:
+                        tool.roi_shape = roi_shape_json
+                    except Exception:
+                        pass
                     tool.save()
                     created += 1
 

@@ -1,14 +1,10 @@
 <template>
   <div>
     <div class="d-flex align-items-center mb-3">
-      <BAlert variant="success" show class="mb-0 me-2 flex-grow-1">
+      <BAlert variant="success" show class="mb-0 flex-grow-1">
         <Icon name="info-circle" size="1.2rem" class="me-2" />
         <strong>Inspeções:</strong> visão geral das receitas salvas no orquestrador
       </BAlert>
-      <BButton :disabled="loading" variant="outline-success" size="sm" @click="$emit('refresh')" class="ms-auto">
-        <Icon name="arrow-clockwise" size="1rem" class="me-1" />
-        {{ loading ? 'Carregando...' : 'Atualizar' }}
-      </BButton>
     </div>
 
     <div class="table-container">
@@ -32,14 +28,18 @@
         <!-- Ações -->
         <template #cell(actions)="{ item }">
           <div class="d-flex gap-1 justify-content-end">
-            <BButton size="sm" variant="outline-primary" @click="$emit('view', item.raw)" title="Detalhes">
-              <Icon name="eye" size="0.8rem" />
-            </BButton>
+            
             <BButton size="sm" variant="secondary" :to="`/inspections/${item.raw.id}/edit`" title="Editar Offline">
               <Icon name="pencil-square" size="0.8rem" />
             </BButton>
             <BButton size="sm" variant="info" @click="$emit('edit-online', item.raw)" title="Editar Online">
               <Icon name="cloud-arrow-up" size="0.8rem" />
+            </BButton>
+            <BButton size="sm" variant="success" @click="$emit('update-vm', item.raw)" title="Atualizar VM">
+              <Icon name="arrow-clockwise" size="0.8rem" />
+            </BButton>
+            <BButton size="sm" variant="outline-primary" @click="$emit('duplicate', item.raw)" title="Duplicar">
+              <Icon name="files" size="0.8rem" />
             </BButton>
             <BButton size="sm" variant="danger" @click="$emit('delete', item.raw)" title="Apagar">
               <Icon name="trash3-fill" size="0.8rem" />
@@ -72,7 +72,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false }
 })
 
-defineEmits(['refresh', 'view', 'edit-offline', 'edit-online', 'delete'])
+defineEmits(['edit-offline', 'edit-online', 'update-vm', 'duplicate', 'delete'])
 
 const fields = [
   { key: 'preview', label: '', class: 'text-center', thStyle: { width: '64px' } },

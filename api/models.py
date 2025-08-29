@@ -180,6 +180,8 @@ class InspectionTool(models.Model):
     roi_h = models.IntegerField(default=0, verbose_name='ROI Altura')
 
     inspec_pass_fail = models.BooleanField(default=False, verbose_name='Afeta Pass/Fail')
+    # ROI completo em JSON (para suportar shapes complexos mantendo compatibilidade com os campos x/y/w/h)
+    roi_shape = models.JSONField(default=dict, blank=True, verbose_name='ROI (shape)')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

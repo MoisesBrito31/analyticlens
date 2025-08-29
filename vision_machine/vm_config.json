@@ -8,47 +8,38 @@
     "tools": [
       {
         "order_index": 0,
-        "name": "grayscale_filter",
+        "name": "grayscale_1",
         "type": "grayscale",
         "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
+          "shape": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 752,
+            "h": 480
+          }
         },
         "inspec_pass_fail": false,
         "method": "luminance",
-        "normalize": false
+        "normalize": true
       },
       {
         "order_index": 1,
-        "name": "threshold_3",
-        "type": "threshold",
-        "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
-        },
-        "inspec_pass_fail": false,
-        "mode": "binary",
-        "th_min": 30,
-        "th_max": 100
-      },
-      {
-        "order_index": 2,
-        "name": "comprimidos",
+        "name": "blob_2",
         "type": "blob",
         "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
+          "shape": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 752,
+            "h": 480
+          }
         },
         "inspec_pass_fail": true,
         "th_min": 30,
         "th_max": 255,
-        "area_min": 0,
+        "area_min": 100,
         "area_max": 10000000,
         "total_area_test": false,
         "blob_count_test": true,
@@ -78,5 +69,5 @@
     "interval_ms": 1000
   },
   "error_msg": "",
-  "last_saved": "2025-08-26T01:52:56.839865"
+  "last_saved": "2025-08-28T21:27:00.439367"
 }

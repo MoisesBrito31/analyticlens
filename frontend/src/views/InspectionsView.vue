@@ -17,11 +17,19 @@
             <BCardBody class="p-4 p-md-5">
               <BRow>
                 <BCol cols="12">
+                  <!-- Filtros -->
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="form-label mb-0">Filtrar por VM:</label>
+                    <BFormSelect v-model="vmFilter" :options="vmFilterOptions" style="max-width: 280px" />
+                  </div>
+
                   <InspectionsTable
                     :inspections="inspections"
                     :loading="loading"
-                    @refresh="loadInspections"
                     @edit-offline="goEditOffline"
+                    @update-vm="updateVMFromRow"
+                    @duplicate="duplicateInspection"
+                    @delete="confirmDelete"
                   />
                 </BCol>
               </BRow>
@@ -43,6 +51,21 @@
         </BCol>
       </BRow>
     </BContainer>
+
+    <!-- Modal de confirmação de exclusão -->
+    <BModal v-model="showDeleteModal" title="Remover inspeção" hide-footer>
+      <p>
+        Tem certeza que deseja remover a inspeção
+        <strong v-if="toDelete">{{ toDelete.name || ('ID ' + toDelete.id) }}</strong>?
+      </p>
+      <div v-if="deleteError" class="text-danger mb-2">{{ deleteError }}</div>
+      <div class="d-flex justify-content-end gap-2">
+        <BButton variant="secondary" @click="showDeleteModal = false" :disabled="deleting">Cancelar</BButton>
+        <BButton variant="danger" @click="doDelete" :disabled="deleting">
+          {{ deleting ? 'Removendo...' : 'Remover' }}
+        </BButton>
+      </div>
+    </BModal>
   </div>
 </template>
 
@@ -50,8 +73,10 @@
 import TopMenu from '@/components/TopMenu.vue'
 import Icon from '@/components/Icon.vue'
 import InspectionsTable from '@/components/InspectionsTable.vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiFetch } from '@/utils/http'
+import { BFormSelect } from 'bootstrap-vue-3'
 import {
   BContainer,
   BRow,
@@ -61,12 +86,20 @@ import {
   BCardBody,
   BAlert,
   BButton,
-  BTable
+  BTable,
+  BModal
 } from 'bootstrap-vue-3'
 
 // Estado da tabela de inspeções
 const inspections = ref([])
 const loading = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+const showDeleteModal = ref(false)
+const toDelete = ref(null)
+const router = useRouter()
+const vmFilter = ref('')
+const vmFilterOptions = ref([{ value: '', text: 'Todas as VMs' }])
 
 const fields = [
   { key: 'name', label: 'Inspeção' },
@@ -87,9 +120,16 @@ const tableItems = computed(() =>
 async function loadInspections() {
   loading.value = true
   try {
-    const res = await apiFetch('/api/inspections')
+    const query = vmFilter.value ? `?vm_id=${encodeURIComponent(vmFilter.value)}` : ''
+    const res = await apiFetch(`/api/inspections${query}`)
     const data = await res.json()
     inspections.value = Array.isArray(data) ? data : (data?.inspections || [])
+    // Popular opções de filtro de VM uma vez
+    const vms = new Map()
+    for (const it of inspections.value) {
+      if (it.vm && it.vm.id) vms.set(String(it.vm.id), it.vm.name || `VM ${it.vm.id}`)
+    }
+    vmFilterOptions.value = [{ value: '', text: 'Todas as VMs' }, ...Array.from(vms.entries()).map(([id, name]) => ({ value: id, text: name }))]
   } catch (e) {
     // Fallback em erro
     inspections.value = []
@@ -100,9 +140,96 @@ async function loadInspections() {
 
 onMounted(loadInspections)
 
+// Atualiza automaticamente quando o filtro muda
+watch(vmFilter, () => {
+  loadInspections()
+})
+
 function goEditOffline(row) {
   if (!row || !row.raw?.id) return
   window.location.href = `/inspections/${row.raw.id}/edit`
+}
+
+function confirmDelete(insp) {
+  if (!insp || !insp.id) return
+  toDelete.value = { id: insp.id, name: insp.name }
+  deleteError.value = ''
+  showDeleteModal.value = true
+}
+
+async function doDelete() {
+  if (!toDelete.value) return
+  try {
+    deleting.value = true
+    deleteError.value = ''
+    const res = await apiFetch(`/api/inspections/${toDelete.value.id}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Falha ao remover')
+    showDeleteModal.value = false
+    toDelete.value = null
+    await loadInspections()
+  } catch (e) {
+    deleteError.value = e.message || 'Erro ao remover'
+  } finally {
+    deleting.value = false
+  }
+}
+
+// Atualizar VM a partir da inspeção selecionada (republicar configuração atual da inspeção na VM relacionada)
+async function updateVMFromRow(insp) {
+  try {
+    if (!insp || !insp.id) return
+    // Buscar detalhes completos da inspeção para enviar todos os parâmetros das tools
+    const detRes = await apiFetch(`/api/inspections/${insp.id}`)
+    const det = await detRes.json()
+    const toolsPayload = Array.isArray(det.tools) ? det.tools : []
+
+    const res = await apiFetch(`/api/inspections/${insp.id}/update_vm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tools: toolsPayload })
+    })
+    if (!res.ok) throw new Error('Falha ao atualizar VM')
+    // Redireciona para visão Ao Vivo da VM associada
+    const vmId = (det && det.vm && det.vm.id) ? det.vm.id : (insp.vm && insp.vm.id ? insp.vm.id : null)
+    if (vmId) {
+      router.push(`/machines/${vmId}`)
+    } else {
+      await loadInspections()
+    }
+  } catch (e) {
+    alert(e.message || 'Erro ao atualizar VM a partir da inspeção')
+  }
+}
+
+// Duplicar inspeção: cria uma nova com sufixo "_copy" e mantém mesma VM e tools
+async function duplicateInspection(insp) {
+  try {
+    if (!insp || !insp.id) return
+    // Buscar detalhes
+    const detRes = await apiFetch(`/api/inspections/${insp.id}`)
+    const det = await detRes.json()
+    const vmId = det?.vm?.id || null
+    const name = `${det.name || 'inspec'}_copy`
+    // Enviar via endpoint de salvar inspeção da VM (reuso):
+    if (!vmId) {
+      alert('Não foi possível duplicar: inspeção sem VM associada.')
+      return
+    }
+    const payload = {
+      name,
+      overwrite: false,
+      payload: { tools: det.tools, reference_image_url: det.reference_image_url }
+    }
+    const saveRes = await apiFetch(`/api/vms/${vmId}/inspections/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    if (!saveRes.ok) throw new Error('Falha ao duplicar inspeção')
+    await loadInspections()
+  } catch (e) {
+    alert(e.message || 'Erro ao duplicar inspeção')
+  }
 }
 </script>
 
