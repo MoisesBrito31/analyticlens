@@ -112,6 +112,15 @@ python vm.py --machine-id vm_001 --django-url http://localhost:8000
 - `/api/trigger_config` - Configuração do trigger
 - WebSocket para comunicação em tempo real
 
+**Fontes de imagem suportadas (Vision Machine):** `pasta`, `camera`, `camera_IP`, `picamera2`.
+
+Exemplo (Raspberry Pi - Picamera2):
+```bash
+curl -X PUT http://<IP_DA_VM>:5000/api/source_config \
+  -H "Content-Type: application/json" \
+  -d '{"type":"picamera2","resolution":[1280,720]}'
+```
+
 ### Frontend (Vue 3 + Vite)
 
 Já está configurado no diretório `frontend/`.

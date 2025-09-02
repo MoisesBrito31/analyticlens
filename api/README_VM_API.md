@@ -241,6 +241,7 @@ Retorna resumo do status de todas as VMs.
 - `camera_IP`: Câmera IP
 - `pasta`: Pasta de Imagens
 - `rtsp`: Stream RTSP
+- `picamera2`: Câmera Raspberry Pi (biblioteca Picamera2)
 
 ### Tipos de Trigger
 - `continuous`: Contínuo

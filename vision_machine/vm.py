@@ -49,6 +49,7 @@ class ImageSource:
         self.source_config = source_config
         self.source_type = source_config.get('type', 'camera')
         self.capture = None
+        self.picamera2 = None
         self.image_files = []
         self.current_image_index = 0
         
@@ -64,6 +65,8 @@ class ImageSource:
                 self._initialize_camera_source()
             elif self.source_type == 'camera_IP':
                 self._initialize_rtsp_source()
+            elif self.source_type in ['picamera2', 'camerapi2']:
+                self._initialize_camerapi2_source()
             else:
                 error_msg = f"Tipo de source não suportado: {self.source_type}"
                 logger.error(error_msg)
@@ -165,6 +168,51 @@ class ImageSource:
             logger.error(f"Erro ao inicializar RTSP {rtsp_url}: {str(e)}")
             self.capture = None
             raise  # Re-raise para propagar o erro
+
+    def _initialize_camerapi2_source(self):
+        """Inicializa source usando Picamera2 (Raspberry Pi)"""
+        try:
+            from picamera2 import Picamera2  # Import local para não quebrar em outros ambientes
+        except Exception as e:
+            error_msg = (
+                "Biblioteca Picamera2 não disponível. Instale via sistema (ex.: 'sudo apt install python3-picamera2') "
+                f"ou execute em um Raspberry Pi com suporte. Detalhes: {str(e)}"
+            )
+            logger.error(error_msg)
+            raise ImportError(error_msg)
+
+        try:
+            resolution = self.source_config.get('resolution', (640, 480))
+            width, height = int(resolution[0]), int(resolution[1])
+
+            self.picamera2 = Picamera2()
+            try:
+                # Preferir configuração de vídeo para captura contínua
+                video_config = self.picamera2.create_video_configuration(
+                    main={"size": (width, height), "format": "RGB888"}
+                )
+            except Exception:
+                # Fallback para preview em sistemas com limitações
+                video_config = self.picamera2.create_preview_configuration(
+                    main={"size": (width, height), "format": "RGB888"}
+                )
+            self.picamera2.configure(video_config)
+            self.picamera2.start()
+
+            logger.info(
+                f"Source Picamera2 inicializado: {width}x{height} (formato RGB888)"
+            )
+
+        except Exception as e:
+            logger.error(f"Erro ao inicializar Picamera2: {str(e)}")
+            # Garantir cleanup parcial
+            try:
+                if self.picamera2 is not None:
+                    self.picamera2.close()
+            except Exception:
+                pass
+            self.picamera2 = None
+            raise
     
     def get_frame(self) -> Optional[np.ndarray]:
         """Obtém o próximo frame da fonte de imagem"""
@@ -173,6 +221,8 @@ class ImageSource:
                 return self._get_folder_frame()
             elif self.source_type in ['camera', 'camera_IP']:
                 return self._get_camera_frame()
+            elif self.source_type in ['picamera2', 'camerapi2']:
+                return self._get_camerapi2_frame()
             else:
                 error_msg = f"Tipo de source não suportado: {self.source_type}"
                 logger.error(f"❌ {error_msg}")
@@ -235,6 +285,27 @@ class ImageSource:
             logger.error(f"❌ {error_msg}")
             # Re-raise para ser capturado pelo _processing_loop
             raise Exception(error_msg)
+
+    def _get_camerapi2_frame(self) -> Optional[np.ndarray]:
+        """Obtém frame da câmera via Picamera2"""
+        if self.picamera2 is None:
+            error_msg = "Picamera2 não está inicializada"
+            logger.error(f"❌ {error_msg}")
+            raise Exception(error_msg)
+
+        try:
+            # Picamera2 retorna RGB; converter para BGR para compatibilidade com OpenCV
+            rgb_frame = self.picamera2.capture_array()
+            if rgb_frame is None:
+                error_msg = "Falha ao capturar frame da Picamera2"
+                logger.error(f"❌ {error_msg}")
+                raise Exception(error_msg)
+            bgr_frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
+            return bgr_frame
+        except Exception as e:
+            error_msg = f"Erro ao ler frame da Picamera2: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            raise Exception(error_msg)
     
     def release(self):
         """Libera recursos da câmera"""
@@ -242,6 +313,17 @@ class ImageSource:
             self.capture.release()
             self.capture = None
             logger.info("Recursos da câmera liberados")
+        if self.picamera2 is not None:
+            try:
+                self.picamera2.stop()
+            except Exception:
+                pass
+            try:
+                self.picamera2.close()
+            except Exception:
+                pass
+            self.picamera2 = None
+            logger.info("Recursos da Picamera2 liberados")
     
     def update_config(self, new_config: Dict[str, Any]):
         """Atualiza configuração do source"""

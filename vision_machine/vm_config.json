@@ -8,7 +8,7 @@
     "tools": [
       {
         "order_index": 0,
-        "name": "grayscale_1",
+        "name": "filtro_cinza",
         "type": "grayscale",
         "ROI": {
           "shape": "rect",
@@ -21,7 +21,7 @@
         },
         "inspec_pass_fail": false,
         "method": "luminance",
-        "normalize": true
+        "normalize": false
       },
       {
         "order_index": 1,
@@ -30,16 +30,16 @@
         "ROI": {
           "shape": "rect",
           "rect": {
-            "x": 0,
-            "y": 0,
-            "w": 752,
-            "h": 480
+            "x": 140,
+            "y": 32,
+            "w": 423,
+            "h": 405
           }
         },
         "inspec_pass_fail": true,
         "th_min": 30,
         "th_max": 255,
-        "area_min": 100,
+        "area_min": 1000,
         "area_max": 10000000,
         "total_area_test": false,
         "blob_count_test": true,
@@ -69,5 +69,5 @@
     "interval_ms": 1000
   },
   "error_msg": "",
-  "last_saved": "2025-08-28T21:27:00.439367"
+  "last_saved": "2025-08-30T00:09:54.979422"
 }

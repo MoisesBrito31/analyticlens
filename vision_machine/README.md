@@ -18,6 +18,7 @@ A Vision Machine é um servidor Flask robusto para visão computacional que se c
 - **Pasta de Imagens**: Processamento de arquivos locais
 - **Câmera Local**: Captura direta via OpenCV
 - **Câmera IP**: Stream RTSP/HTTP
+- **Câmera Raspberry Pi (Picamera2)**: Captura nativa via biblioteca Picamera2
 
 ### **⚡ Modos de Operação**
 - **Contínuo**: Inspeção automática em intervalos configuráveis
@@ -64,6 +65,16 @@ Edite `vm_config.json` para configurar:
 - Modo de trigger
 - Pipeline de ferramentas
 
+Exemplo de configuração de fonte Picamera2:
+```json
+{
+  "source_config": {
+    "type": "picamera2",
+    "resolution": [1280, 720]
+  }
+}
+```
+
 ### **3. Execução**
 ```bash
 python vm.py
@@ -72,6 +83,26 @@ python vm.py
 ### **4. Acesso**
 - **API**: http://localhost:5000
 - **WebSocket**: ws://localhost:5000
+
+## 📷 Picamera2 (Raspberry Pi)
+
+### Instalação no Raspberry Pi OS
+```bash
+sudo apt update && sudo apt install -y python3-picamera2
+sudo usermod -aG video $USER  # reinicie a sessão após
+```
+
+### Configuração via API
+```bash
+curl -X PUT http://<IP_DA_VM>:5000/api/source_config \
+  -H "Content-Type: application/json" \
+  -d '{"type":"picamera2","resolution":[1280,720]}'
+```
+
+Observações:
+- O tipo de fonte JSON é `picamera2` (igual ao nome da biblioteca).
+- Um alias `camerapi2` é aceito temporariamente para retrocompatibilidade.
+- A imagem é capturada em RGB e convertida internamente para BGR (OpenCV).
 
 ## 📚 **Documentação**
 
