@@ -72,6 +72,7 @@ class ProtocoloVM:
 
     def _update_db_from_status(self, vm: VirtualMachine, status_payload: Dict[str, Any]) -> None:
         vm_status = status_payload.get('status')
+        vm_mode = status_payload.get('mode')
         vm_error = status_payload.get('error_msg')
         vm_connection_status = 'connected'
 
@@ -83,10 +84,13 @@ class ProtocoloVM:
             new_status = mapped_status
 
         vm.status = new_status
+        # Atualizar modo: VM reporta 'TESTE' ou 'RUN'; DB usa 'TESTE' ou 'PRODUCAO'
+        if vm_mode in ['TESTE', 'RUN']:
+            vm.mode = 'PRODUCAO' if vm_mode == 'RUN' else 'TESTE'
         vm.connection_status = vm_connection_status
         vm.last_heartbeat = timezone.now()
         vm.error_message = vm_error or ''
-        vm.save(update_fields=['status', 'connection_status', 'last_heartbeat', 'error_message', 'updated_at'])
+        vm.save(update_fields=['status', 'mode', 'connection_status', 'last_heartbeat', 'error_message', 'updated_at'])
 
     def _handle_http_error(self, vm: VirtualMachine, exc: Exception, update_db_on_error: bool) -> Dict[str, Any]:
         # Se for timeout, marcar como OFFLINE apenas quando autorizado a atualizar DB neste fluxo
@@ -203,9 +207,12 @@ class ProtocoloVM:
     def _handle_change_mode(self, vm: VirtualMachine, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
             mode = params.get('mode')
-            if mode not in ['TESTE', 'RUN']:
+            # Aceitar modos do domínio do Django: TESTE, PRODUCAO
+            if mode not in ['TESTE', 'RUN', 'PRODUCAO']:
                 return {'ok': False, 'error': 'Modo inválido'}
-            self._post_control(vm, {"command": "change_mode", "params": {"mode": mode}})
+            # Mapear PRODUCAO -> RUN para a VM
+            vm_mode = 'RUN' if mode == 'PRODUCAO' else mode
+            self._post_control(vm, {"command": "change_mode", "params": {"mode": vm_mode}})
             return self._handle_get_status(vm, {})
         except Exception as e:
             return self._handle_http_error(vm, e, True)

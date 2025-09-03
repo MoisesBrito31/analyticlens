@@ -407,8 +407,8 @@ class TestModeProcessor:
         logger.info("🔄 Loop de processamento iniciado")
         while self.running:
             try:
-                # Verificar se está em modo teste
-                if self.vm.mode != 'TESTE':
+                # Verificar se está em modo válido (TESTE ou RUN)
+                if self.vm.mode not in ['TESTE', 'RUN']:
                     time.sleep(0.1)
                     continue
                 
@@ -534,7 +534,7 @@ class TestModeProcessor:
             raise Exception(error_message)
     
     def _send_websocket_update(self, result: Dict[str, Any]):
-        """Envia atualização para WebSocket (limitado a 1 por segundo)"""
+        """Envia atualização para WebSocket (no TESTE com rate limit; no RUN sem limite)"""
         # Verificar se há erro ativo
         if self.vm.status == 'error':
             logger.warning("⚠️ Não enviando WebSocket devido a erro ativo")
@@ -542,7 +542,19 @@ class TestModeProcessor:
             
         current_time = time.time()
         
-        if current_time - self.last_websocket_update >= self.websocket_update_interval:
+        # No modo TESTE não aplicar rate limit; no RUN manter intervalo (máx. 1/s)
+        if self.vm.mode == 'TESTE':
+            should_emit = True
+        else:
+            # Usar intervalo configurável no modo RUN, com fallback de 1.0s
+            run_interval = 1.0
+            try:
+                run_interval = float(self.vm.__dict__.get('websocket_update_RUN_mode', 1.0))
+            except Exception:
+                run_interval = 1.0
+            should_emit = (current_time - self.last_websocket_update >= run_interval)
+        
+        if should_emit:
             try:
                 # Preparar dados para WebSocket
                 source_type = self.vm.image_source.source_type if self.vm.image_source else 'none'
@@ -707,6 +719,8 @@ class VisionMachine:
                     "type": "continuous",
                     "interval_ms": 500  # 500ms para processamento mais rápido
                 })
+                # Intervalo de atualização do WebSocket no modo RUN (segundos)
+                self.websocket_update_RUN_mode = config.get('websocket_update_RUN_mode', 1.0)
                 
                 logger.info(f"Configurações carregadas de {self.config_file}")
             else:
@@ -744,6 +758,8 @@ class VisionMachine:
             "type": "continuous",  # "continuous" ou "trigger"
             "interval_ms": 500    # 500ms para processamento mais rápido (apenas modo contínuo)
         }
+        # Padrão: no RUN limitar WebSocket a 1s
+        self.websocket_update_RUN_mode = 1.0
 
     def save_config(self):
         """Salva configurações atuais no arquivo JSON"""
@@ -758,6 +774,7 @@ class VisionMachine:
                 'source_config': self.source_config,
                 'trigger_config': self.trigger_config,
                 'error_msg': self.error_msg,  # Salvar mensagem de erro
+                'websocket_update_RUN_mode': getattr(self, 'websocket_update_RUN_mode', 1.0),
                 'last_saved': datetime.utcnow().isoformat()
             }
             
@@ -1264,13 +1281,13 @@ class FlaskVisionServer:
                         return jsonify({"success": True, "message": "Inspeção já está rodando"})
                     
                     self.vm.status = 'running'
-                    # Iniciar processador de teste se estiver em modo teste
-                    if self.vm.mode == 'TESTE':
-                        logger.info("🧪 Modo TESTE detectado, iniciando processador...")
+                    # Iniciar processador tanto no TESTE quanto no RUN
+                    if self.vm.mode in ['TESTE', 'RUN']:
+                        logger.info("▶️ Iniciando processador de inspeção...")
                         self.test_processor.start()
-                        logger.info("✅ Processador de teste iniciado com sucesso")
+                        logger.info("✅ Processador iniciado com sucesso")
                     else:
-                        logger.info(f"⚠️ Modo atual não é TESTE: {self.vm.mode}")
+                        logger.info(f"⚠️ Modo atual não suportado para start: {self.vm.mode}")
                     logger.info("Inspeção iniciada")
                     return jsonify({"success": True})
                 
