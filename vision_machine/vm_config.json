@@ -37,10 +37,10 @@
           }
         },
         "inspec_pass_fail": true,
-        "th_min": 30,
+        "th_min": 0,
         "th_max": 255,
         "area_min": 1000,
-        "area_max": 10000000,
+        "area_max": 2000,
         "total_area_test": false,
         "blob_count_test": true,
         "test_total_area_min": 50,
@@ -51,7 +51,22 @@
         "approx_epsilon_ratio": 0.003,
         "polygon_max_points": 1000
       }
-    ]
+    ],
+    "source_config": {
+      "type": "pasta",
+      "camera_id": 0,
+      "folder_path": "./testblob_images",
+      "rtsp_url": "",
+      "fps": 30,
+      "resolution": [
+        752,
+        480
+      ]
+    },
+    "trigger_config": {
+      "type": "trigger",
+      "interval_ms": 500
+    }
   },
   "source_config": {
     "type": "pasta",
@@ -65,10 +80,10 @@
     "rtsp_url": ""
   },
   "trigger_config": {
-    "type": "continuous",
-    "interval_ms": 35
+    "type": "trigger",
+    "interval_ms": 500
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-03T14:29:12.839483"
+  "last_saved": "2025-09-03T18:06:39.283420"
 }

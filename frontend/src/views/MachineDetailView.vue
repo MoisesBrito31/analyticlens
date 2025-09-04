@@ -78,9 +78,15 @@
                 <div class="mt-4">
                   <div class="d-flex align-items-center justify-content-between mb-3">
                     <h4 class="mb-0">Transmissão ao vivo</h4>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
                       <div v-if="wsStatus">
                         <BBadge :variant="getWsVariant(wsStatus)">{{ wsStatus }}</BBadge>
+                      </div>
+                      <div class="d-flex gap-1 align-items-center">
+                        <BButton size="sm" variant="outline-success" :disabled="vmActionLoading" @click="vmCommand('start')">Start</BButton>
+                        <BButton size="sm" variant="outline-warning" :disabled="vmActionLoading" @click="vmCommand('stop')">Stop</BButton>
+                        <BButton size="sm" variant="outline-secondary" :disabled="vmActionLoading" @click="vmCommand('restart')">Restart</BButton>
+                        <BButton size="sm" variant="outline-primary" :disabled="vmActionLoading || triggerDisabled" @click="vmCommand('trigger')">Trigger</BButton>
                       </div>
                       <BButton
                         size="sm"
@@ -191,6 +197,8 @@ const showSuccessToast = ref(false)
 const showErrorToast = ref(false)
 const toastTitle = ref('')
 const toastMsg = ref('')
+const vmActionLoading = ref(false)
+const triggerDisabled = computed(() => String(vm.value?.trigger_type || '').toLowerCase() !== 'trigger')
 
 const canSaveInspection = computed(() => {
   const s = (wsStatus.value || '').toLowerCase()
@@ -277,6 +285,32 @@ const loadVM = async () => {
 }
 
 onMounted(loadVM)
+async function vmCommand(action) {
+  if (!vm.value?.id) return
+  try {
+    vmActionLoading.value = true
+    const res = await apiFetch(`/api/vms/${vm.value.id}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ erro: 'Falha ao executar comando' }))
+      throw new Error(err?.erro || 'Falha ao executar comando')
+    }
+    // Recarregar dados da VM após ação (exceto para trigger)
+    if (action !== 'trigger') {
+      await loadVM()
+    }
+  } catch (e) {
+    console.error('vm action error', e)
+    toastTitle.value = 'Erro'
+    toastMsg.value = e?.message || 'Erro ao executar comando'
+    showErrorToast.value = true
+  } finally {
+    vmActionLoading.value = false
+  }
+}
 
 function connectWebSocket() {
   if (!vm.value) return

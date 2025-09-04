@@ -947,27 +947,151 @@ class InspectionUpdateVM(APIView):
         try:
             # body.tools é obrigatório (somente tools para VM)
             body = request.data if isinstance(request.data, dict) else {}
-            tools = body.get('tools')
-            if not isinstance(tools, list):
-                return Response({'erro': 'Campo tools é obrigatório como lista'}, status=status.HTTP_400_BAD_REQUEST)
+            tools = body.get('tools') if isinstance(body.get('tools'), list) else None
+            # Permitir chamadas que apenas atualizam source/trigger sem tools
+            if tools is None and not (isinstance(body.get('source_config'), dict) or isinstance(body.get('trigger_config'), dict)):
+                return Response({'erro': 'Forneça tools (lista) ou source/trigger para atualizar'}, status=status.HTTP_400_BAD_REQUEST)
 
             insp = Inspection.objects.select_related('vm').filter(id=insp_id).first()
             if not insp:
                 return Response({'erro': 'Inspeção não encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
             vm = insp.vm
-            # Montar payload de configuração de inspeção conforme VM espera
-            config_payload = {
-                'config': {
-                    'tools': tools
-                }
-            }
+            # Persistir alterações de source/trigger na tabela da VM relacionada
+            try:
+                vm_updated_fields = []
+                # Atualizar source_config → campos diretos e JSON
+                if isinstance(body.get('source_config'), dict):
+                    src = body.get('source_config')
+                    try:
+                        stype = str(src.get('type') or vm.source_type)
+                        if stype and stype != vm.source_type:
+                            vm.source_type = stype
+                            vm_updated_fields.append('source_type')
+                    except Exception:
+                        pass
+                    try:
+                        cam_id = int(src.get('camera_id')) if src.get('camera_id') is not None else vm.camera_id
+                        if cam_id != vm.camera_id:
+                            vm.camera_id = cam_id
+                            vm_updated_fields.append('camera_id')
+                    except Exception:
+                        pass
+                    try:
+                        fps_val = int(src.get('fps')) if src.get('fps') is not None else vm.fps
+                        if fps_val != vm.fps:
+                            vm.fps = fps_val
+                            vm_updated_fields.append('fps')
+                    except Exception:
+                        pass
+                    try:
+                        folder = str(src.get('folder_path') or '')
+                        if folder != vm.folder_path:
+                            vm.folder_path = folder
+                            vm_updated_fields.append('folder_path')
+                    except Exception:
+                        pass
+                    try:
+                        rtsp = str(src.get('rtsp_url') or '')
+                        if rtsp != vm.rtsp_url:
+                            vm.rtsp_url = rtsp
+                            vm_updated_fields.append('rtsp_url')
+                    except Exception:
+                        pass
+                    try:
+                        res = src.get('resolution')
+                        if isinstance(res, (list, tuple)) and len(res) == 2:
+                            rw = int(res[0]) if res[0] is not None else vm.resolution_width
+                            rh = int(res[1]) if res[1] is not None else vm.resolution_height
+                            if rw != vm.resolution_width:
+                                vm.resolution_width = rw
+                                vm_updated_fields.append('resolution_width')
+                            if rh != vm.resolution_height:
+                                vm.resolution_height = rh
+                                vm_updated_fields.append('resolution_height')
+                    except Exception:
+                        pass
 
-            # Enviar para VM via protocolo
-            protocolo = ProtocoloVM()
-            result = protocolo.send_command(vm, 'update_inspection_config', params=config_payload)
-            if not result.get('ok', False):
-                return Response({'erro': result.get('error', 'Falha ao atualizar VM')}, status=status.HTTP_502_BAD_GATEWAY)
+                    # Atualizar inspection_config JSON
+                    try:
+                        cfg = vm.inspection_config or {}
+                        if not isinstance(cfg, dict):
+                            cfg = {}
+                        cfg['source_config'] = src
+                        vm.inspection_config = cfg
+                        if 'inspection_config' not in vm_updated_fields:
+                            vm_updated_fields.append('inspection_config')
+                    except Exception:
+                        pass
+
+                # Atualizar trigger_config → campos diretos e JSON
+                if isinstance(body.get('trigger_config'), dict):
+                    trg = body.get('trigger_config')
+                    try:
+                        ttype = str(trg.get('type') or vm.trigger_type)
+                        if ttype and ttype != vm.trigger_type:
+                            vm.trigger_type = ttype
+                            vm_updated_fields.append('trigger_type')
+                    except Exception:
+                        pass
+                    try:
+                        interval = int(trg.get('interval_ms')) if trg.get('interval_ms') is not None else vm.trigger_interval_ms
+                        if interval != vm.trigger_interval_ms:
+                            vm.trigger_interval_ms = interval
+                            vm_updated_fields.append('trigger_interval_ms')
+                    except Exception:
+                        pass
+
+                    # Atualizar inspection_config JSON
+                    try:
+                        cfg = vm.inspection_config or {}
+                        if not isinstance(cfg, dict):
+                            cfg = {}
+                        cfg['trigger_config'] = trg
+                        vm.inspection_config = cfg
+                        if 'inspection_config' not in vm_updated_fields:
+                            vm_updated_fields.append('inspection_config')
+                    except Exception:
+                        pass
+
+                if vm_updated_fields:
+                    # Sempre atualiza updated_at
+                    vm.save(update_fields=list(set(vm_updated_fields + ['updated_at'])))
+            except Exception:
+                # Não bloquear fluxo por erro de persistência local
+                pass
+            # Montar payload de configuração de inspeção conforme VM espera (quando houver tools)
+            config_payload = None
+            if tools is not None:
+                config_payload = {
+                    'config': {
+                        'tools': tools
+                    }
+                }
+            # Encaminhar source_config e trigger_config quando fornecidos
+            if isinstance(body.get('source_config'), dict):
+                # A VM expõe endpoints separados para source/trigger, mas também mantém em inspection_config
+                try:
+                    ProtocoloVM().send_command(vm, 'update_source_config', params=body.get('source_config'))
+                except Exception:
+                    pass
+                # incluir na config principal também (para consistência visual)
+                if config_payload is not None:
+                    config_payload['config']['source_config'] = body.get('source_config')
+            if isinstance(body.get('trigger_config'), dict):
+                try:
+                    ProtocoloVM().send_command(vm, 'update_trigger_config', params=body.get('trigger_config'))
+                except Exception:
+                    pass
+                if config_payload is not None:
+                    config_payload['config']['trigger_config'] = body.get('trigger_config')
+
+            # Enviar para VM via protocolo quando houver tools
+            if config_payload is not None:
+                protocolo = ProtocoloVM()
+                result = protocolo.send_command(vm, 'update_inspection_config', params=config_payload)
+                if not result.get('ok', False):
+                    return Response({'erro': result.get('error', 'Falha ao atualizar VM')}, status=status.HTTP_502_BAD_GATEWAY)
 
             return Response({'success': True})
         except Exception as e:

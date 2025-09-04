@@ -10,6 +10,15 @@
 
 ---
 
+### **✅ Atualizações recentes (2025-09-03)**
+- **VM (modo de operação)**: Implementado `RUN` com limitação de envio ao WebSocket (máximo 1 atualização/segundo). Em `TESTE`, o WebSocket não tem limitação e acompanha cada trigger/processamento.
+- **Configuração**: Adicionado parâmetro `websocket_update_RUN_mode` em `vision_machine/vm_config.json` (fallback padrão 1.0s) para ajustar o intervalo no modo `RUN` sem alterar código.
+- **API/Orquestrador**: Atualizado `api/protocolo.py` para mapear modos `RUN ↔ PRODUCAO` e persistir `mode` corretamente no banco a partir do `/api/status` e do `change_mode`.
+
+### **➡️ Próximos passos correlatos**
+- **Endpoint runtime (opcional)**: Expor `websocket_update_RUN_mode` via API REST para ajuste em tempo de execução.
+- **Eventos WebSocket (opcional)**: Padronizar evento dedicado para `RUN` (ex.: `run_result`) caso desejado, mantendo compatibilidade com `test_result`.
+
 ### **�� Fase 2: Backend de Visão Computacional (PRÓXIMA PRIORIDADE)**
 
 #### **2.1 Módulo de Tools Base**

@@ -38,6 +38,56 @@
                   </BCol>
                 </BRow>
 
+                <!-- Source e Trigger (logo após seleção da VM) -->
+                <BRow class="mb-3 g-3">
+                  <BCol cols="12" md="6">
+                    <div class="mb-2 fw-semibold">Source</div>
+                    <BRow class="g-2">
+                      <BCol cols="12" md="6">
+                        <label class="form-label">Tipo</label>
+                        <BFormSelect v-model="sourceConfig.type" :options="sourceTypeOptions" />
+                      </BCol>
+                      <BCol cols="12" md="6" v-if="sourceConfig.type === 'camera'">
+                        <label class="form-label">Camera ID</label>
+                        <BFormInput type="number" v-model.number="sourceConfig.camera_id" />
+                      </BCol>
+                      <BCol cols="12" md="6" v-if="sourceConfig.type === 'pasta'">
+                        <label class="form-label">Pasta</label>
+                        <BFormInput v-model="sourceConfig.folder_path" />
+                      </BCol>
+                      <BCol cols="12" md="6" v-if="sourceConfig.type === 'camera_IP'">
+                        <label class="form-label">RTSP URL</label>
+                        <BFormInput v-model="sourceConfig.rtsp_url" />
+                      </BCol>
+                      <BCol cols="6" md="3">
+                        <label class="form-label">Res Largura</label>
+                        <BFormInput type="number" v-model.number="resolutionWidth" />
+                      </BCol>
+                      <BCol cols="6" md="3">
+                        <label class="form-label">Res Altura</label>
+                        <BFormInput type="number" v-model.number="resolutionHeight" />
+                      </BCol>
+                      <BCol cols="12" md="3">
+                        <label class="form-label">FPS</label>
+                        <BFormInput type="number" v-model.number="sourceConfig.fps" />
+                      </BCol>
+                    </BRow>
+                  </BCol>
+                  <BCol cols="12" md="6">
+                    <div class="mb-2 fw-semibold">Trigger</div>
+                    <BRow class="g-2">
+                      <BCol cols="12" md="6">
+                        <label class="form-label">Tipo</label>
+                        <BFormSelect v-model="triggerConfig.type" :options="triggerTypeOptions" />
+                      </BCol>
+                      <BCol cols="12" md="6" v-if="triggerConfig.type === 'continuous'">
+                        <label class="form-label">Intervalo (ms)</label>
+                        <BFormInput type="number" min="100" v-model.number="triggerConfig.interval_ms" />
+                      </BCol>
+                    </BRow>
+                  </BCol>
+                </BRow>
+
                 <!-- Linha com referência e parâmetros da tool selecionada -->
                 <BRow class="g-3 mb-3 align-items-stretch">
                   <BCol cols="12" md="6">
@@ -397,7 +447,22 @@ const inspId = ref(null)
 const form = ref({ name: '', description: '' })
 const selectedVmId = ref('')
 const vmOptions = ref([])
+const sourceConfig = ref({ type: 'pasta', camera_id: 0, folder_path: '', rtsp_url: '', fps: 30, resolution: [752, 480] })
+const triggerConfig = ref({ type: 'continuous', interval_ms: 500 })
+const resolutionWidth = ref(752)
+const resolutionHeight = ref(480)
+const sourceTypeOptions = [
+  { value: 'pasta', text: 'Pasta' },
+  { value: 'camera', text: 'Câmera Local' },
+  { value: 'camera_IP', text: 'Câmera IP (RTSP)' },
+  { value: 'picamera2', text: 'Picamera2' }
+]
+const triggerTypeOptions = [
+  { value: 'continuous', text: 'Contínuo' },
+  { value: 'trigger', text: 'Gatilho' }
+]
 const toolsItems = ref([])
+const originalToolsSnapshot = ref('')
 const selectedIdx = ref(-1)
 const refImagePath = ref('')
 const refPreviewUrl = ref('')
@@ -914,6 +979,50 @@ async function load() {
     form.value.description = data.description || ''
     selectedVmId.value = data.vm?.id ? String(data.vm.id) : ''
     toolsItems.value = Array.isArray(data.tools) ? data.tools.map(t => ({ ...t })) : []
+    // snapshot inicial das tools para detectar mudanças
+    originalToolsSnapshot.value = snapshotTools(toolsItems.value)
+    // Tentar carregar configs da VM associada
+    if (data.vm && data.vm.id) {
+      try {
+        const rvm = await apiFetch(`/api/vms/${data.vm.id}`)
+        const jvm = await rvm.json()
+        // source
+        const src = (jvm.inspection_config && jvm.inspection_config.source_config) || null
+        const legacySrc = jvm.source_type ? {
+          type: jvm.source_type,
+          camera_id: jvm.camera_id,
+          folder_path: jvm.folder_path,
+          rtsp_url: jvm.rtsp_url,
+          fps: jvm.fps,
+          resolution: [jvm.resolution_width, jvm.resolution_height]
+        } : null
+        const chosenSrc = src || legacySrc
+        if (chosenSrc) {
+          sourceConfig.value = {
+            type: chosenSrc.type || 'pasta',
+            camera_id: Number(chosenSrc.camera_id)||0,
+            folder_path: chosenSrc.folder_path || '',
+            rtsp_url: chosenSrc.rtsp_url || '',
+            fps: Number(chosenSrc.fps)||30,
+            resolution: Array.isArray(chosenSrc.resolution) ? chosenSrc.resolution : [Number(jvm.resolution_width)||752, Number(jvm.resolution_height)||480]
+          }
+          resolutionWidth.value = Number(sourceConfig.value.resolution?.[0]) || 752
+          resolutionHeight.value = Number(sourceConfig.value.resolution?.[1]) || 480
+        }
+        // trigger
+        const trg = (jvm.inspection_config && jvm.inspection_config.trigger_config) || null
+        const legacyTrg = jvm.trigger_type ? { type: jvm.trigger_type, interval_ms: jvm.trigger_interval_ms } : null
+        const chosenTrg = trg || legacyTrg
+        if (chosenTrg) {
+          triggerConfig.value = {
+            type: chosenTrg.type || 'continuous',
+            interval_ms: Number(chosenTrg.interval_ms)||500
+          }
+        }
+      } catch (e) {
+        // silencioso: mantém defaults
+      }
+    }
     // Guardar vmId para redirecionamento após updateVM
     if (data.vm && typeof data.vm.id !== 'undefined')
       sessionStorage.setItem(`insp_vm_${id}`, String(data.vm.id))
@@ -932,6 +1041,56 @@ async function load() {
   }
 }
 
+function normalizeToolForCompare(t) {
+  return {
+    order_index: Number(t.order_index)||0,
+    name: String(t.name||''),
+    type: String(t.type||''),
+    ROI: normalizeROIForSave(t.ROI),
+    inspec_pass_fail: !!t.inspec_pass_fail,
+    method: t.method,
+    normalize: !!t.normalize,
+    ksize: Number(t.ksize),
+    sigma: Number(t.sigma),
+    mode: t.mode,
+    th_min: Number(t.th_min),
+    th_max: Number(t.th_max),
+    kernel: Number(t.kernel),
+    open: Number(t.open),
+    close: Number(t.close),
+    shape: t.shape,
+    area_min: Number(t.area_min),
+    area_max: Number(t.area_max),
+    total_area_test: !!t.total_area_test,
+    blob_count_test: !!t.blob_count_test,
+    test_total_area_min: Number(t.test_total_area_min),
+    test_total_area_max: Number(t.test_total_area_max),
+    test_blob_count_min: Number(t.test_blob_count_min),
+    test_blob_count_max: Number(t.test_blob_count_max),
+    contour_chain: t.contour_chain,
+    approx_epsilon_ratio: Number(t.approx_epsilon_ratio),
+    polygon_max_points: Number(t.polygon_max_points),
+    operation: t.operation,
+    reference_tool_id: Number(t.reference_tool_id),
+    custom_formula: t.custom_formula
+  }
+}
+
+function snapshotTools(arr) {
+  try {
+    const norm = (Array.isArray(arr) ? arr : []).map(normalizeToolForCompare)
+    // ordenar por order_index e name para estabilidade
+    norm.sort((a,b)=> (a.order_index-b.order_index) || String(a.name).localeCompare(String(b.name)))
+    return JSON.stringify(norm)
+  } catch {
+    return '[]'
+  }
+}
+
+function toolsChanged() {
+  return snapshotTools(toolsItems.value) !== originalToolsSnapshot.value
+}
+
 async function save() {
   try {
     saving.value = true
@@ -939,6 +1098,7 @@ async function save() {
       name: form.value.name,
       description: form.value.description,
       vm_id: selectedVmId.value ? Number(selectedVmId.value) : null,
+      // persistência offline de tools
       tools: toolsItems.value.map(t => ({
         order_index: t.order_index,
         name: t.name,
@@ -978,6 +1138,57 @@ async function save() {
       body: JSON.stringify(payload)
     })
     if (!res.ok) throw new Error('Falha ao salvar')
+    // Após salvar offline, se houver VM selecionada,
+    // enviar source/trigger sempre; tools apenas se houve mudança
+    if (selectedVmId.value) {
+      const includeTools = toolsChanged()
+      const livePayload = {
+        source_config: {
+          ...sourceConfig.value,
+          resolution: [Number(resolutionWidth.value)||752, Number(resolutionHeight.value)||480]
+        },
+        trigger_config: { ...triggerConfig.value },
+        ...(includeTools ? { tools: toolsItems.value.map(t => ({
+          order_index: t.order_index,
+          name: t.name,
+          type: t.type,
+          ROI: normalizeROIForSave(t.ROI),
+          inspec_pass_fail: !!t.inspec_pass_fail,
+          method: t.method,
+          normalize: t.normalize,
+          ksize: t.ksize,
+          sigma: t.sigma,
+          mode: t.mode,
+          th_min: t.th_min,
+          th_max: t.th_max,
+          kernel: t.kernel,
+          open: t.open,
+          close: t.close,
+          shape: t.shape,
+          area_min: t.area_min,
+          area_max: t.area_max,
+          total_area_test: t.total_area_test,
+          blob_count_test: t.blob_count_test,
+          test_total_area_min: t.test_total_area_min,
+          test_total_area_max: t.test_total_area_max,
+          test_blob_count_min: t.test_blob_count_min,
+          test_blob_count_max: t.test_blob_count_max,
+          contour_chain: t.contour_chain,
+          approx_epsilon_ratio: t.approx_epsilon_ratio,
+          polygon_max_points: t.polygon_max_points,
+          operation: t.operation,
+          reference_tool_id: t.reference_tool_id,
+          custom_formula: t.custom_formula
+        })) } : {})
+      }
+      await apiFetch(`/api/inspections/${inspId.value}/update_vm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(livePayload)
+      })
+      // Atualiza snapshot após envio bem-sucedido
+      originalToolsSnapshot.value = snapshotTools(toolsItems.value)
+    }
     goBack()
   } catch (e) {
     error.value = e.message || 'Erro ao salvar'
@@ -1028,7 +1239,13 @@ function showJson() {
 async function updateVM() {
   try {
     saving.value = true
-    const payload = { vm_id: selectedVmId.value ? Number(selectedVmId.value) : null, tools: toolsItems.value.map(t => ({
+    const payload = { vm_id: selectedVmId.value ? Number(selectedVmId.value) : null,
+      source_config: {
+        ...sourceConfig.value,
+        resolution: [Number(resolutionWidth.value)||752, Number(resolutionHeight.value)||480]
+      },
+      trigger_config: { ...triggerConfig.value },
+      tools: toolsItems.value.map(t => ({
       order_index: t.order_index,
       name: t.name,
       type: t.type,
@@ -1076,6 +1293,7 @@ async function updateVM() {
     saving.value = false
   }
 }
+
 
 function vmIdFromQuery() {
   // Tenta extrair vmId se vier na rota (?vm=ID); se não, tenta usar a inspeção carregada (não retornamos vmId no GET atual)
