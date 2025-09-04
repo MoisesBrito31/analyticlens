@@ -1,0 +1,186 @@
+analyticLens - TODO
+
+Atualize esta lista sempre que surgir uma nova ideia. Use [x] para concluído, [ ] para pendente e [–] para cancelado.
+
+Frontend
+- (FE 1) [x] Exibir status e metadados da VM em frontend/src/views/MachineDetailView.vue
+- (FE 2) [x] Integrar frontend com endpoint de status da VM (GET /api/vms/{id})
+- (FE 3) [x] Tratar erros e estados vazios na tela de máquina
+- (FE 4) [ ] Componentizar seções de MachineDetailView.vue (arquivo está grande)
+- (FE 5) [–] Adicionar polling para atualizar status periodicamente (cancelado: WebSocket via Socket.IO já implementado)
+- (FE 6) [>] Edição de inspeção em modo ao vivo (modificações são refletidas imediatamente no fluxo da VM)
+- (FE 7) [ ] Gestão dos resultados das inspeções salvas (usabilidade)
+- (FE 8) [ ] Melhorar sistema de usuário (manter usuário logado sob sessão)
+- (FE 9) [ ] Melhorar sistema de usuário: definir tipos de usuários e limitar funções que cada usuário pode executar (baixa prioridade)
+
+Backend
+- (BE 1) [x] Centralizar atualização de status da VM em função única (ProtocoloVM.update_status)
+- (BE 2) [x] Acionar atualização de status após comando start (VMAction.post + handlers)
+- (BE 3) [x] Garantir nome do comando manual "trigger_trigger" (preferência atendida)
+- (BE 4) [ ] Endpoint PUT /api/inspection_config com validações e permissões
+- (BE 5) [ ] Listagem/paginação/filtros de inspeções e metadados
+- (BE 6) [ ] Autenticação com sessão/JWT + refresh; CSRF; timeouts
+- (BE 7) [ ] RBAC: permission classes nos endpoints críticos (ex.: vm_action)
+- (BE 8) [ ] Propagar parâmetros de configuração da Tool Blob
+- (BE 9) [ ] Emissão/rotação de tokens para VM e handshake de WebSocket
+- (BE 10) [ ] Log: endpoint/broker; retenção e indexação
+- (BE 11) [ ] Configuração de integrações ModbusTCP/Ethernet-IP (mapeamentos, validação)
+- (BE 12) [ ] Políticas de rejeição/aceitação e auditoria de I/O
+- (BE 14) [ ] Compatibilidade de schema e endpoints de configuração para Tools
+
+QA / Tests
+- (QA 1) [x] Consolidar testes de ferramentas em vision_machine/test_tools.py
+- (QA 2) [ ] Adicionar testes para função de status da VM (ProtocoloVM.update_status)
+- (QA 3) [ ] Testes de integração FE↔BE↔VM (edição ao vivo)
+- (QA 4) [ ] Testes de API e snapshot para listagem de inspeções
+- (QA 5) [ ] Testes de autenticação (sessão/JWT)
+- (QA 6) [ ] Testes de autorização (RBAC)
+- (QA 7) [ ] Dataset e métricas para Tool Blob
+- (QA 8) [ ] Testes de carga com JWT/WebSocket
+- (QA 9) [ ] Testes de throughput para o pipeline de logs
+- (QA 10) [ ] Testes simulados para ModbusTCP/Ethernet-IP
+- (QA 11) [ ] Testes de integração para controle de I/O
+- (QA 12) [ ] Testes de precisão e fixtures para Tools
+
+Docs
+- (DO 1) [ ] Criar diagrama UML da arquitetura atual (alto nível)
+- (DO 2) [ ] Documentar setup e scripts no README
+- (DO 3) [ ] Documentar fluxo/payloads da edição ao vivo
+- (DO 4) [ ] Documentar endpoints e filtros da listagem de inspeções
+- (DO 5) [ ] Guia de autenticação (login/logout, expiração)
+- (DO 6) [ ] Matriz de permissões (RBAC)
+- (DO 7) [ ] Documentação dos parâmetros da Tool Blob
+- (DO 8) [ ] Segurança e operação com JWT/WebSocket
+- (DO 9) [ ] Manual de operação e retenção de logs
+- (DO 10) [ ] Pinagem/registradores para integrações industriais
+- (DO 11) [ ] Documentação de uso das Tools
+
+VM (Vision Machine - Servidor Flask)
+- (VM 1) [x] Expor WebSocket via Flask-SocketIO (eventos connected, status_update, test_result)
+- (VM 2) [x] Endpoints REST básicos: /api/status, /api/control, /api/*_config
+- (VM 3) [x] Suporte a modos de trigger (continuous/trigger) e comando manual trigger
+- (VM 4) [x] Atualizar heartbeat em trigger manual
+- (VM 5) [ ] Implementar validações adicionais para configs (source/trigger/inspection)
+- (VM 6) [ ] Adicionar métricas e healthcheck dedicados (ex.: /api/health, uptime)
+- (VM 7) [ ] Cobrir com testes de integração WebSocket (cliente Socket.IO)
+- (VM 8) [ ] Documentar API da VM (README com exemplos curl e eventos WS)
+- (VM 9) [ ] Revisar erros da Tool Blob: manchas pretas não são detectadas e manchas brancas com manchas pretas no seu interior,
+    se pequenas, são ignoradas.
+- (VM 10) [ ] Estudar a viabilidade técnica, sob a ótica de performance, de aplicar JWT entre VM e Orquestrador 
+    (considerando o stream do WebSocket)
+- (VM 11) [ ] Projetar a estrutura da feature de log de resultados (quem será o responsável por gerar) 
+    com foco em performance
+- (VM 12) [ ] Adicionar comunicação ModbusTCP para integrar a VM a dispositivos industriais (baixa prioridade)
+- (VM 13) [ ] Adicionar comunicação Ethernet/IP (dispositivos Rockwell) - (baixa prioridade)
+- (VM 14) [ ] Implementar Tool EDGE: dada uma linha, identificar ao longo dela todas as bordas existentes e retornar a quantidade de bordas,
+    seus pontos (x, y) e o ângulo em relação à linha informada
+- (VM 15) [ ] Implementar Tool Locate: objetivo básico como a EDGE; com o resultado, reajustar
+    a posição dos ROIs de todas as ferramentas subsequentes
+- (VM 16) [ ] Implementar Tool Blob Locate: usará análises de blob para realocar o ROI de outras ferramentas
+- (VM 17) [ ] Implementar Tool Measure: a partir de dois pontos, calcular a distância entre eles
+    os pontos podem ser posições de edges ou centróides de blobs
+- (VM 18) [ ] Implementar Tool Match: por meio de uma área de interesse da imagem, buscar formas com percentual 
+    de similaridade com a referência
+- (VM 19) [ ] Implementar Tool OCR (baixa prioridade)
+- (VM 20) [ ] Implementar Tool de decodificação de códigos 1D (baixa prioridade)
+- (VM 21) [ ] Implementar Tool de decodificação de códigos 2D (baixa prioridade)
+- (VM 22) [ ] Implementar controle de I/O relacionado ao fluxo de inspeção (ex.: rejeição acionar I/O 2), gerando acionamento de registros 
+    de protocolos industriais ou acionamento de GPIO em caso de Raspberry (baixa prioridade)
+
+
+
+
+Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
+
+- (FE 6) [>] Edição de inspeção em modo ao vivo (modificações refletidas imediatamente)
+  - (VM 5) [ ] VM: aplicar mudanças de configuração em tempo real; emitir eventos Socket.IO de confirmação/erro
+    - (BE 4) [ ] Orquestrador (Django): endpoint para propagar atualizações (PUT /api/inspection_config); validações e permissões
+      - (FE 6) [ ] Frontend: UI de edição ao vivo com feedback (loading/erro), updates otimistas e rollback
+        - (QA 3) [ ] QA/Docs: testes de integração FE↔BE↔VM; documentar fluxo e payloads
+
+- (FE 7) [ ] Gestão dos resultados das inspeções salvas (usabilidade)
+  - (VM 1) [ ] VM: garantir payload consistente (mime, resolução, campos result/tools)
+    - (BE 5) [ ] Orquestrador (Django): listagem/paginação/filtros; metadados (tempo, ferramenta, decisão)
+      - (FE 7) [ ] Frontend: tabela com filtros, preview da imagem, detalhe com JSON e métricas; exportação (CSV/JSON)
+        - (QA 4) [ ] QA/Docs: testes de API e snapshot de UI; documentação dos endpoints
+
+- (FE 8) [ ] Melhorar sistema de usuário (sessão persistente)
+  - (BE 6) [ ] Orquestrador (Django): estratégia de sessão/JWT + refresh; CSRF; timeouts
+    - (FE 8) [ ] Frontend: guarda de rotas, persistência segura (storage), renovação de token
+      - (QA 5) [ ] QA/Docs: testes de autenticação; guia de login/logout e expiração
+
+- (FE 9) [ ] Definir papéis e permissões (RBAC) — baixa prioridade
+  - (BE 7) [ ] Orquestrador (Django): papéis (admin, operador, visualizador); permission classes nos endpoints críticos (ex.: vm_action)
+    - (FE 9) [ ] Frontend: esconder/desabilitar ações conforme papel; mensagens de permissão insuficiente
+      - (QA 6) [ ] QA/Docs: testes de autorização; matriz de permissões documentada
+
+- (VM 9) [ ] Revisar Tool Blob (detecção de manchas)
+  - (VM 9) [ ] VM: ajustes de thresholds e morfologia; testes com imagens sintéticas
+    - (BE 8) [ ] Orquestrador (Django): aceitar/propagar parâmetros de configuração da Tool Blob
+      - (FE 6) [ ] Frontend: UI para parametrização (threshold, área mínima, circularidade); overlay de depuração
+        - (QA 7) [ ] QA/Docs: dataset de teste, métricas de acurácia; documentação dos parâmetros
+
+- (VM 10) [ ] JWT entre VM e Orquestrador (análise de performance)
+  - (BE 9) [ ] Orquestrador (Django): emissão/rotação de tokens e segredo; handshake de WebSocket
+    - (VM 10) [ ] VM: validação dos tokens nos endpoints/status/control; clock skew
+      - (QA 8) [ ] QA/Docs: testes de carga; documentação de segurança e operação
+
+- (VM 11) [ ] Log de resultados (performance e responsabilidade)
+  - (BE 10) [ ] Orquestrador (Django): endpoint/broker; retenção e indexação
+    - (VM 11) [ ] VM: envio assíncrono, backoff e correlação (trace-id)
+      - (QA 9) [ ] QA/Docs: testes de throughput; manual de operação e retenção
+
+- (VM 12) [ ] Integração industrial: ModbusTCP
+  - (BE 11) [ ] Orquestrador (Django): UI/API para configurar mapeamentos; validações
+    - (FE 7) [ ] Frontend: telas de configuração e diagnóstico; indicadores online/offline
+      - (QA 10) [ ] QA/Docs: testes simulados; documentação de pinagem e registradores
+
+- (VM 13) [ ] Integração industrial: Ethernet/IP
+  - (BE 11) [ ] Orquestrador (Django): UI/API para configurar mapeamentos; validações
+    - (FE 7) [ ] Frontend: telas de configuração e diagnóstico; indicadores online/offline
+      - (QA 10) [ ] QA/Docs: testes simulados; documentação de pinagem e registradores
+
+- (VM 22) [ ] Controle de I/O no fluxo de inspeção
+  - (BE 12) [ ] Orquestrador (Django): políticas de rejeição/aceitação; auditoria
+    - (FE 7) [ ] Frontend: toggles/botões de teste; estado em tempo real
+      - (QA 11) [ ] QA/Docs: testes de integração com simulação; SOP de segurança
+
+- (VM 14) [ ] Tool EDGE
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 15) [ ] Tool Locate
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 16) [ ] Tool Blob Locate
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 17) [ ] Tool Measure
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 18) [ ] Tool Match
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 19) [ ] Tool OCR
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 20) [ ] Decodificação de códigos 1D
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
+
+- (VM 21) [ ] Decodificação de códigos 2D
+  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
+      - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso

@@ -6,6 +6,7 @@ import MachinesView from '@/views/MachinesView.vue'
 import MachineDetailView from '@/views/MachineDetailView.vue'
 import InspectionsView from '@/views/InspectionsView.vue'
 import InspectionEditOfflineView from '@/views/InspectionEditOfflineView.vue'
+import InspectionEditOnlineView from '@/views/InspectionEditOnlineView.vue'
 import ConfigurationsView from '@/views/ConfigurationsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -51,6 +52,12 @@ const router = createRouter({
       path: '/inspections/:id/edit',
       name: 'inspection-edit-offline',
       component: InspectionEditOfflineView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/machines/:id/edit-online',
+      name: 'inspection-edit-online',
+      component: InspectionEditOnlineView,
       meta: { requiresAuth: true }
     },
     {

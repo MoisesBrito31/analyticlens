@@ -96,6 +96,16 @@
                       >
                         Salvar receita
                       </BButton>
+                      <RouterLink :to="`/machines/${vm?.id}/edit-online`">
+                        <BButton
+                          size="sm"
+                          variant="info"
+                          class="text-white"
+                          :disabled="vmActionLoading"
+                        >
+                          Editar (ao vivo)
+                        </BButton>
+                      </RouterLink>
                     </div>
                   </div>
                   <BRow class="live-row g-3">
@@ -146,6 +156,8 @@
     Já existe uma inspeção com este nome. Deseja sobrescrever?
   </BModal>
 
+  
+
   <!-- Toasts -->
   <div class="position-fixed top-0 end-0 p-3" style="z-index: 1080;">
     <BToast v-model="showSuccessToast" :title="toastTitle" variant="success" solid auto-hide-delay="3000">
@@ -170,6 +182,7 @@ import { BFormTextarea } from 'bootstrap-vue-3'
 import { BBadge } from 'bootstrap-vue-3'
 import { BModal } from 'bootstrap-vue-3'
 import { BFormInput, BFormGroup } from 'bootstrap-vue-3'
+// import { BFormSelect } from 'bootstrap-vue-3'
 import { io } from 'socket.io-client'
 
 const route = useRoute()
@@ -209,6 +222,8 @@ function openSaveModal() {
   saveName.value = vm.value?.name || vm.value?.machine_id || ''
   showSaveModal.value = true
 }
+
+// Edição de Inspeção (ao vivo) migrou para a rota dedicada /machines/:id/edit-online
 
 async function doSaveInspection(overwrite = false) {
   if (!vm.value) return
