@@ -22,6 +22,9 @@
                 :contour-paths="contourPaths"
                 :has-contours="hasContours"
                 :analysis-colors="analysisColors"
+                :editable="isEditingEnabled"
+                :roi-shape="selectedRoiShape"
+                @roi-change="onRoiChange"
               />
             </div>
           </template>
@@ -31,6 +34,13 @@
             </slot>
           </div>
         </div>
+        <ToolCardsPanel
+          v-if="displayItems.length"
+          class="mt-3"
+          :items="displayItems"
+          :selected-index="selectedIndex"
+          @select="onSelectCard"
+        />
       </div>
       <div class="right">
         <div class="overall-status">
@@ -103,6 +113,7 @@
                 :type="selectedToolType"
                 :params="activeParams"
                 :read-only="props.readOnly"
+                :roi="selectedRoiShape"
                 @update="onParamsUpdate"
               />
             </div>
@@ -158,24 +169,7 @@
         </div>
       </div>
     </div>
-    <div v-if="displayItems.length" class="tools-panel mt-3">
-      <div class="tools-header">Ciclo de Inspeção</div>
-      <div class="tools-grid">
-        <div
-          v-for="(item, idx) in displayItems"
-          :key="itemKey(item, idx)"
-          class="tool-card"
-          :title="cardTitle(item)"
-          @click="handleItemClick(item, idx)"
-          :class="cardClass(item, idx)"
-        >
-          <div class="status-dot" :class="statusClass(item)"></div>
-          <div class="tool-name">{{ cardName(item) }}</div>
-          <div class="tool-type">{{ cardType(item) }}</div>
-          <div class="tool-meta" v-if="item?.processing_time_ms !== undefined">{{ item.processing_time_ms }} ms</div>
-        </div>
-      </div>
-    </div>
+    
   </div>
 </template>
 
@@ -187,6 +181,7 @@ import MetricsPanel from '@/components/MetricsPanel.vue'
 import ToolParamsPanel from '@/components/ToolParamsPanel.vue'
 import { useToolParams } from '@/composables/useToolParams'
 import RoiOverlay from '@/components/RoiOverlay.vue'
+import ToolCardsPanel from '@/components/ToolCardsPanel.vue'
 
 const props = defineProps({
   binary: {
@@ -243,6 +238,7 @@ const selectedIndex = ref(-1)
 const selectedRoi = ref(null)
 const selectedRoiShape = ref(null)
 const hasAutoSelected = ref(false)
+const isEditingEnabled = computed(() => !props.readOnly && !!selectedRoiShape.value)
 
 const aspectRatio = computed(() => {
   if (typeof props.ratio === 'number') return String(props.ratio)
@@ -471,6 +467,12 @@ function handleItemClick(item, idx) {
       pass_fail: extractPassFail(item)
     })
   }
+}
+
+function onSelectCard(idx) {
+  const item = displayItems.value[idx]
+  if (!item) return
+  handleItemClick(item, idx)
 }
 
 function isToolSelectedIdx(idx) {
@@ -971,6 +973,23 @@ const activeParams = computed(() => {
 })
 
 function onParamsUpdate({ key, value }) {
+  // Atualização imediata do overlay quando ROI muda via parâmetros
+  if (key === 'ROI' && value && typeof value === 'object') {
+    if (value.shape === 'rect' && value.rect) {
+      selectedRoi.value = { ...value.rect }
+      selectedRoiShape.value = { shape: 'rect', rect: { ...value.rect } }
+    } else if (value.shape === 'circle' && value.circle) {
+      selectedRoi.value = null
+      selectedRoiShape.value = { shape: 'circle', circle: { ...value.circle } }
+    } else if (value.shape === 'ellipse' && value.ellipse) {
+      selectedRoi.value = null
+      selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...value.ellipse } }
+    }
+    // Propaga mudança para o pai para envio à VM
+    emitParam('ROI', value)
+    return
+  }
+
   if (selectedToolType.value === 'blob') {
     updateBlobParam(key, value)
   } else {
@@ -988,6 +1007,25 @@ function emitParam(key, value) {
   if (props.readOnly) return
   if (selectedIndex.value < 0) return
   emit('update-tool-param', { index: selectedIndex.value, key, value })
+}
+
+function onRoiChange(newShape) {
+  if (props.readOnly) return
+  if (selectedIndex.value < 0) return
+  // Atualiza estado local para feedback imediato
+  if (newShape?.shape === 'rect' && newShape.rect) {
+    selectedRoi.value = { ...newShape.rect }
+    selectedRoiShape.value = { shape: 'rect', rect: { ...newShape.rect } }
+    emit('update-tool-param', { index: selectedIndex.value, key: 'ROI', value: { shape: 'rect', rect: { ...newShape.rect } } })
+  } else if (newShape?.shape === 'circle' && newShape.circle) {
+    selectedRoi.value = null
+    selectedRoiShape.value = { shape: 'circle', circle: { ...newShape.circle } }
+    emit('update-tool-param', { index: selectedIndex.value, key: 'ROI', value: { shape: 'circle', circle: { ...newShape.circle } } })
+  } else if (newShape?.shape === 'ellipse' && newShape.ellipse) {
+    selectedRoi.value = null
+    selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...newShape.ellipse } }
+    emit('update-tool-param', { index: selectedIndex.value, key: 'ROI', value: { shape: 'ellipse', ellipse: { ...newShape.ellipse } } })
+  }
 }
 </script>
 
@@ -1088,11 +1126,6 @@ function emitParam(key, value) {
   color: #6c757d;
 }
 
-.tools-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
-}
 .metrics-panel {
   border: 1px solid #e9ecef;
   border-radius: 10px;
@@ -1268,71 +1301,11 @@ function emitParam(key, value) {
   color: #0d6efd;
 }
 
-.tools-panel {
-  border: 1px solid #e9ecef;
-  border-radius: 10px;
-  background: #fff;
-}
-
 .tools-header {
   font-weight: 600;
   padding: 10px 12px;
   border-bottom: 1px solid #e9ecef;
 }
-
-.tool-card {
-  aspect-ratio: 1 / 1;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color .15s ease, box-shadow .15s ease, transform .05s ease;
-  position: relative;
-}
-
-.tool-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.tool-type {
-  color: #6c757d;
-  font-size: 0.85rem;
-}
-
-.tool-card:hover {
-  border-color: #cfe2ff;
-  box-shadow: 0 2px 8px rgba(13,110,253,.1);
-}
-
-.tool-card.selected {
-  border-color: #0d6efd;
-  box-shadow: 0 0 0 2px rgba(13,110,253,.2);
-}
-
-.tool-meta {
-  margin-top: 4px;
-  font-size: 0.8rem;
-  color: #6c757d;
-}
-
-.status-dot {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px #fff;
-}
-
-.status-pass { background: #198754; }
-.status-fail { background: #dc3545; }
-.status-unknown { background: #adb5bd; }
 </style>
 
 

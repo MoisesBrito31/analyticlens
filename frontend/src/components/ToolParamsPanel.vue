@@ -1,6 +1,32 @@
 <template>
   <FormKit type="form" :actions="false">
     <div class="form-section">
+      <div class="section-title">Região de Interesse (ROI)</div>
+      <div class="row g-2 mb-2">
+        <div class="col-12 col-md-6">
+          <FormKit type="select" :label="'Shape'" :options="shapeOptions" :disabled="readOnly"
+            :model-value="roiModel.shape" @input="onShapeChange" />
+        </div>
+        <template v-if="roiModel.shape === 'rect'">
+          <div class="col-6 col-md-3"><FormKit type="number" :label="'x'" :step="1" :disabled="readOnly" :model-value="roiModel.rect.x" @input="v=>onRectField('x', v)" /></div>
+          <div class="col-6 col-md-3"><FormKit type="number" :label="'y'" :step="1" :disabled="readOnly" :model-value="roiModel.rect.y" @input="v=>onRectField('y', v)" /></div>
+          <div class="col-6 col-md-3"><FormKit type="number" :label="'w'" :step="1" :disabled="readOnly" :model-value="roiModel.rect.w" @input="v=>onRectField('w', v)" /></div>
+          <div class="col-6 col-md-3"><FormKit type="number" :label="'h'" :step="1" :disabled="readOnly" :model-value="roiModel.rect.h" @input="v=>onRectField('h', v)" /></div>
+        </template>
+        <template v-else-if="roiModel.shape === 'circle'">
+          <div class="col-6 col-md-4"><FormKit type="number" :label="'cx'" :step="1" :disabled="readOnly" :model-value="roiModel.circle.cx" @input="v=>onCircleField('cx', v)" /></div>
+          <div class="col-6 col-md-4"><FormKit type="number" :label="'cy'" :step="1" :disabled="readOnly" :model-value="roiModel.circle.cy" @input="v=>onCircleField('cy', v)" /></div>
+          <div class="col-12 col-md-4"><FormKit type="number" :label="'r'" :step="1" :disabled="readOnly" :model-value="roiModel.circle.r" @input="v=>onCircleField('r', v)" /></div>
+        </template>
+        <template v-else-if="roiModel.shape === 'ellipse'">
+          <div class="col-6 col-md-3"><FormKit type="number" :label="'cx'" :step="1" :disabled="readOnly" :model-value="roiModel.ellipse.cx" @input="v=>onEllipseField('cx', v)" /></div>
+          <div class="col-6 col-md-3"><FormKit type="number" :label="'cy'" :step="1" :disabled="readOnly" :model-value="roiModel.ellipse.cy" @input="v=>onEllipseField('cy', v)" /></div>
+          <div class="col-6 col-md-2"><FormKit type="number" :label="'rx'" :step="1" :disabled="readOnly" :model-value="roiModel.ellipse.rx" @input="v=>onEllipseField('rx', v)" /></div>
+          <div class="col-6 col-md-2"><FormKit type="number" :label="'ry'" :step="1" :disabled="readOnly" :model-value="roiModel.ellipse.ry" @input="v=>onEllipseField('ry', v)" /></div>
+          <div class="col-12 col-md-2"><FormKit type="number" :label="'angle'" :step="1" :disabled="readOnly" :model-value="roiModel.ellipse.angle" @input="v=>onEllipseField('angle', v)" /></div>
+        </template>
+      </div>
+
       <component
         :is="activeComp"
         v-if="activeComp"
@@ -14,10 +40,11 @@
       </template>
     </div>
   </FormKit>
+  
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue'
+import { computed, defineProps, defineEmits, ref, watch } from 'vue'
 import BlobParams from '@/components/tool-params/BlobParams.vue'
 import GrayscaleParams from '@/components/tool-params/GrayscaleParams.vue'
 import BlurParams from '@/components/tool-params/BlurParams.vue'
@@ -28,7 +55,8 @@ import MathParams from '@/components/tool-params/MathParams.vue'
 const props = defineProps({
   type: { type: String, default: '' },
   params: { type: Object, default: () => ({}) },
-  readOnly: { type: Boolean, default: true }
+  readOnly: { type: Boolean, default: true },
+  roi: { type: Object, default: null }
 })
 const emit = defineEmits(['update'])
 
@@ -64,6 +92,61 @@ const mathOps = [
 ]
 
 const normalizedType = computed(() => String(props.type || '').toLowerCase())
+
+const shapeOptions = [
+  { value: 'rect', label: 'retângulo' },
+  { value: 'circle', label: 'círculo' },
+  { value: 'ellipse', label: 'elipse' }
+]
+
+const roiModel = ref({
+  shape: 'rect',
+  rect: { x: 0, y: 0, w: 100, h: 100 },
+  circle: { cx: 50, cy: 50, r: 50 },
+  ellipse: { cx: 60, cy: 60, rx: 40, ry: 30, angle: 0 }
+})
+
+function syncFromProps() {
+  const r = props.roi || null
+  if (!r || typeof r !== 'object') return
+  if (r.shape === 'rect' && r.rect) {
+    roiModel.value.shape = 'rect'
+    roiModel.value.rect = { x: +r.rect.x || 0, y: +r.rect.y || 0, w: +r.rect.w || 0, h: +r.rect.h || 0 }
+  } else if (r.shape === 'circle' && r.circle) {
+    roiModel.value.shape = 'circle'
+    roiModel.value.circle = { cx: +r.circle.cx || 0, cy: +r.circle.cy || 0, r: +r.circle.r || 0 }
+  } else if (r.shape === 'ellipse' && r.ellipse) {
+    roiModel.value.shape = 'ellipse'
+    roiModel.value.ellipse = { cx: +r.ellipse.cx || 0, cy: +r.ellipse.cy || 0, rx: +r.ellipse.rx || 0, ry: +r.ellipse.ry || 0, angle: +r.ellipse.angle || 0 }
+  }
+}
+
+watch(() => props.roi, () => { syncFromProps() }, { immediate: true, deep: true })
+
+function emitRoi() {
+  if (props.readOnly) return
+  const s = roiModel.value.shape
+  if (s === 'rect') {
+    emit('update', { key: 'ROI', value: { shape: 'rect', rect: { ...roiModel.value.rect } } })
+  } else if (s === 'circle') {
+    emit('update', { key: 'ROI', value: { shape: 'circle', circle: { ...roiModel.value.circle } } })
+  } else if (s === 'ellipse') {
+    emit('update', { key: 'ROI', value: { shape: 'ellipse', ellipse: { ...roiModel.value.ellipse } } })
+  }
+}
+
+function onShapeChange(val) {
+  if (props.readOnly) return
+  const newShape = typeof val === 'string' ? val : val?.target?.value
+  if (!newShape) return
+  roiModel.value.shape = newShape
+  emitRoi()
+}
+
+function toNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0 }
+function onRectField(k, v) { if (props.readOnly) return; roiModel.value.rect[k] = toNum(v); emitRoi() }
+function onCircleField(k, v) { if (props.readOnly) return; roiModel.value.circle[k] = toNum(v); emitRoi() }
+function onEllipseField(k, v) { if (props.readOnly) return; roiModel.value.ellipse[k] = toNum(v); emitRoi() }
 
 const activeComp = computed(() => {
   switch (normalizedType.value) {
