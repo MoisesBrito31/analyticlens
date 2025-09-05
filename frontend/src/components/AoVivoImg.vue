@@ -6,42 +6,23 @@
           <template v-if="imageUrl">
             <img :src="imageUrl" :alt="alt" class="frame" :class="fitClass" />
             <div v-if="hasAnyOverlay" class="overlay">
-              <svg class="contour-svg" :viewBox="svgViewBox" preserveAspectRatio="xMidYMid meet">
-                <!-- ROI retângulo -->
-                <rect v-if="showRectOverlay"
-                  :x="effectiveRoiRect?.x || 0" :y="effectiveRoiRect?.y || 0"
-                  :width="effectiveRoiRect?.w || 0" :height="effectiveRoiRect?.h || 0"
-                  fill="rgba(13,110,253,0.15)" stroke="#0d6efd" stroke-width="2" vector-effect="non-scaling-stroke" />
-                <!-- ROI círculo -->
-                <circle v-if="showCircleOverlay" :cx="roiCircle.cx" :cy="roiCircle.cy" :r="roiCircle.r"
-                  fill="rgba(13,110,253,0.15)" stroke="#0d6efd" stroke-width="2" vector-effect="non-scaling-stroke" />
-                <!-- ROI elipse -->
-                <g v-if="showEllipseOverlay" :transform="`rotate(${roiEllipse.angle} ${roiEllipse.cx} ${roiEllipse.cy})`">
-                  <ellipse :cx="roiEllipse.cx" :cy="roiEllipse.cy" :rx="roiEllipse.rx" :ry="roiEllipse.ry"
-                    fill="rgba(13,110,253,0.15)" stroke="#0d6efd" stroke-width="2" vector-effect="non-scaling-stroke" />
-                </g>
-
-                <!-- Blobs: centróides -->
-                <g v-if="showBlobCentroids">
-                  <g v-for="(pt, i) in blobCentroidPointsPx" :key="`bc_${i}`" :stroke="analysisColors.strokeStrong" stroke-width="2" vector-effect="non-scaling-stroke">
-                    <line :x1="pt.x - 6" :y1="pt.y" :x2="pt.x + 6" :y2="pt.y" />
-                    <line :x1="pt.x" :y1="pt.y - 6" :x2="pt.x" :y2="pt.y + 6" />
-                  </g>
-                </g>
-
-                <!-- Blobs: caixas -->
-                <g v-if="showBlobBoxes">
-                  <rect v-for="(bb, i) in blobBoxesPx" :key="`bb_${i}`" :x="bb.x" :y="bb.y" :width="bb.w" :height="bb.h"
-                    fill="none" :stroke="analysisColors.strokeMed" stroke-width="2" vector-effect="non-scaling-stroke" />
-                </g>
-
-                <!-- Blobs: contornos -->
-                <g v-if="showBlobContours && hasContours">
-                  <template v-for="(path, i) in contourPaths" :key="`cp_${i}`">
-                    <path :d="path" :fill="analysisColors.fillContour" :stroke="analysisColors.fillContour" stroke-width="0.8" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" shape-rendering="geometricPrecision" />
-                  </template>
-                </g>
-              </svg>
+              <RoiOverlay
+                :view-box="svgViewBox"
+                :show-rect-overlay="showRectOverlay"
+                :effective-roi-rect="effectiveRoiRect"
+                :show-circle-overlay="showCircleOverlay"
+                :roi-circle="roiCircle"
+                :show-ellipse-overlay="showEllipseOverlay"
+                :roi-ellipse="roiEllipse"
+                :show-blob-centroids="showBlobCentroids"
+                :blob-centroid-points-px="blobCentroidPointsPx"
+                :show-blob-boxes="showBlobBoxes"
+                :blob-boxes-px="blobBoxesPx"
+                :show-blob-contours="showBlobContours"
+                :contour-paths="contourPaths"
+                :has-contours="hasContours"
+                :analysis-colors="analysisColors"
+              />
             </div>
           </template>
           <div v-else class="placeholder">
@@ -58,26 +39,9 @@
             {{ statusText }}
           </span>
         </div>
-        <div class="timeline">
-          <div
-            v-for="(dot, idx) in timelineDisplay"
-            :key="`tl_${idx}`"
-            class="timeline-dot"
-            :class="{
-              'tl-pass': dot === true,
-              'tl-fail': dot === false,
-              'tl-unknown': dot === null
-            }"
-          ></div>
-        </div>
+        <TimelineDots :dots="timelineDisplay" :columns="60" />
         <div class="metrics-panel">
-          <div class="metrics-header">Métricas</div>
-          <div class="metrics-grid">
-            <div class="metric"><div class="label">Aprovados</div><div class="value">{{ metrics?.aprovados ?? '—' }}</div></div>
-            <div class="metric"><div class="label">Reprovados</div><div class="value">{{ metrics?.reprovados ?? '—' }}</div></div>
-            <div class="metric"><div class="label">Tempo</div><div class="value">{{ metrics?.time ?? '—' }}</div></div>
-            <div class="metric"><div class="label">Frame</div><div class="value">{{ metrics?.frame ?? '—' }}</div></div>
-          </div>
+          <MetricsPanel :metrics="metrics" />
         </div>
         <div class="tool-details mt-3" v-if="selectedItem">
           <div class="tools-header">Configuração/Resultados da Tool</div>
@@ -135,54 +99,12 @@
               </FormKit>
             </div>
             <div class="tab-pane" v-show="activeTab === 'params'">
-              <FormKit type="form" :actions="false" disabled>
-                <div class="form-section">
-                  <div v-if="paramEntries.length === 0" class="text-muted small">Sem parâmetros.</div>
-                  <template v-else>
-                    <h6 class="section-subtitle">Configuração</h6>
-                    <div class="row g-2 mb-2">
-                      <template v-for="([key, val], idx) in groupedParams.primary" :key="`pp_${idx}_${key}`">
-                        <div class="col-12 col-md-6" v-if="isBoolean(val)">
-                          <FormKit type="checkbox" :label="labelize(key)" :model-value="val" disabled />
-                        </div>
-                        <div class="col-12 col-md-6" v-else-if="!isLargeObject(val)">
-                          <FormKit type="text" :label="labelize(key)" :model-value="formatValue(val)" disabled />
-                        </div>
-                        <div class="col-12" v-else>
-                          <FormKit type="textarea" :label="labelize(key)" :model-value="formatJson(val)" :rows="4" disabled />
-                        </div>
-                      </template>
-                      <div v-if="groupedParams.primary.length === 0" class="text-muted small">—</div>
-                    </div>
-
-                    <h6 class="section-subtitle mt-2">Testes</h6>
-                    <div class="row g-2 mb-2">
-                      <template v-for="([key, val], idx) in groupedParams.testsEnabled" :key="`tp_${idx}_${key}`">
-                        <div class="col-12 col-md-6">
-                          <FormKit type="checkbox" :label="labelize(key)" :model-value="val" disabled />
-                        </div>
-                      </template>
-                      <div v-if="groupedParams.testsEnabled.length === 0" class="text-muted small">—</div>
-                    </div>
-
-                    <h6 class="section-subtitle mt-2">Sem interação direta</h6>
-                    <div class="row g-2">
-                      <template v-for="([key, val], idx) in groupedParams.others" :key="`op_${idx}_${key}`">
-                        <div class="col-12 col-md-6" v-if="isBoolean(val)">
-                          <FormKit type="checkbox" :label="labelize(key)" :model-value="val" disabled />
-                        </div>
-                        <div class="col-12 col-md-6" v-else-if="!isLargeObject(val)">
-                          <FormKit type="text" :label="labelize(key)" :model-value="formatValue(val)" disabled />
-                        </div>
-                        <div class="col-12" v-else>
-                          <FormKit type="textarea" :label="labelize(key)" :model-value="formatJson(val)" :rows="4" disabled />
-                        </div>
-                      </template>
-                      <div v-if="groupedParams.others.length === 0" class="text-muted small">—</div>
-                    </div>
-                  </template>
-                </div>
-              </FormKit>
+              <ToolParamsPanel
+                :type="selectedToolType"
+                :params="activeParams"
+                :read-only="props.readOnly"
+                @update="onParamsUpdate"
+              />
             </div>
           </div>
           <div class="tab-pane" v-show="activeTab === 'analysis'">
@@ -260,6 +182,11 @@
 <script setup>
 import { ref, watch, onBeforeUnmount, computed } from 'vue'
 import Icon from '@/components/Icon.vue'
+import TimelineDots from '@/components/TimelineDots.vue'
+import MetricsPanel from '@/components/MetricsPanel.vue'
+import ToolParamsPanel from '@/components/ToolParamsPanel.vue'
+import { useToolParams } from '@/composables/useToolParams'
+import RoiOverlay from '@/components/RoiOverlay.vue'
 
 const props = defineProps({
   binary: {
@@ -301,10 +228,14 @@ const props = defineProps({
   ratio: {
     type: [String, Number],
     default: '16/9' // Ex.: '4/3', '1/1', 1.777...
+  },
+  readOnly: {
+    type: Boolean,
+    default: true
   }
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'update-tool-param'])
 
 const imageUrl = ref('')
 let objectUrl = ''
@@ -658,53 +589,9 @@ const selectedDef = computed(() => {
   return findToolDefForItem(it)
 })
 
-const paramEntries = computed(() => {
-  const def = selectedDef.value
-  const makeEntries = (obj) => {
-    if (!obj || typeof obj !== 'object') return []
-    const rest = { ...obj }
-    // Remover campos de ROI explicitamente (não exibir)
-    delete rest.ROI
-    delete rest.roi
-    delete rest.rect
-    delete rest.bbox
-    return Object.entries(rest)
-  }
-  const fromDef = makeEntries(def)
-  if (fromDef.length) return fromDef
-  // Fallback: tentar extrair do próprio item selecionado (caso este seja o config)
-  return makeEntries(selectedItem.value)
-})
+// removido: paramEntries não utilizado após refatoração
 
-// Agrupar parâmetros em categorias: configuração primária, testes e outros
-const groupedParams = computed(() => {
-  const entries = paramEntries.value
-  const primary = []
-  const tests = []
-  const others = []
-
-  const primaryKeys = new Set(['type', 'name', 'method', 'normalize', 'th_min', 'th_max', 'area_min', 'area_max', 'reference_tool_id'])
-  const testKeyPattern = /^(test_|.*_test$|.*_min$|.*_max$)/i
-
-  for (const [key, val] of entries) {
-    if (primaryKeys.has(key)) {
-      primary.push([key, val])
-    } else if (testKeyPattern.test(key)) {
-      tests.push([key, val])
-    } else {
-      others.push([key, val])
-    }
-  }
-
-  // Apenas flags booleanas de teste (habilitados), excluindo *_min, *_max e valores não booleanos
-  const testsEnabled = tests.filter(([key, val]) => {
-    if (/_min$|_max$/i.test(key)) return false
-    return typeof val === 'boolean'
-  })
-
-  return { primary, tests, others, testsEnabled }
-})
-
+// Removido groupedParams não utilizado
 // Dados de análise: separar campos típicos de resultado da tool do item selecionado
 const analysisEntries = computed(() => {
   const it = selectedItem.value
@@ -983,6 +870,125 @@ const timelineDisplay = computed(() => {
   const padCount = Math.max(0, maxTimeline - rev.length)
   return rev.concat(Array(padCount).fill(null))
 })
+
+// Removido handleParamChange não utilizado
+
+const isBlobSelected = computed(() => {
+  const it = selectedItem.value
+  const t = String(it?.tool_type || it?.type || '').toLowerCase()
+  return t === 'blob'
+})
+
+// opções de blob agora definidas no ToolParamsPanel
+
+const blobParams = ref({
+  inspec_pass_fail: false,
+  th_min: 0,
+  th_max: 255,
+  area_min: 0,
+  area_max: 1e12,
+  total_area_test: false,
+  blob_count_test: false,
+  test_total_area_min: 0,
+  test_total_area_max: 1e12,
+  test_blob_count_min: 0,
+  test_blob_count_max: 1000000,
+  contour_chain: 'SIMPLE',
+  approx_epsilon_ratio: 0.01,
+  polygon_max_points: 0
+})
+
+watch(selectedItem, () => {
+  if (!isBlobSelected.value) return
+  const it = selectedItem.value || {}
+  const def = selectedDef.value || {}
+  const src = { ...def, ...it }
+  blobParams.value = {
+    inspec_pass_fail: !!src.inspec_pass_fail,
+    th_min: toNumber(src.th_min),
+    th_max: toNumber(src.th_max, 255),
+    area_min: toNumber(src.area_min, 0, true),
+    area_max: toNumber(src.area_max, 1e12, true),
+    total_area_test: !!src.total_area_test,
+    blob_count_test: !!src.blob_count_test,
+    test_total_area_min: toNumber(src.test_total_area_min, 0, true),
+    test_total_area_max: toNumber(src.test_total_area_max, 1e12, true),
+    test_blob_count_min: toNumber(src.test_blob_count_min, 0),
+    test_blob_count_max: toNumber(src.test_blob_count_max, 1000000),
+    contour_chain: String(src.contour_chain || 'SIMPLE').toUpperCase(),
+    approx_epsilon_ratio: toFloat(src.approx_epsilon_ratio, 0.01),
+    polygon_max_points: toNumber(src.polygon_max_points, 0)
+  }
+}, { immediate: true })
+
+function toNumber(v, def = 0, allowFloat = false) {
+  const n = allowFloat ? parseFloat(v) : parseInt(v)
+  return Number.isFinite(n) ? n : def
+}
+function toFloat(v, def = 0) {
+  const n = parseFloat(v)
+  return Number.isFinite(n) ? n : def
+}
+
+function updateBlobParam(key, value) {
+  if (props.readOnly) return
+  blobParams.value[key] = value
+  if (selectedIndex.value < 0) return
+  emit('update-tool-param', { index: selectedIndex.value, key, value })
+}
+
+const { getParam, selectedToolType } = useToolParams(selectedItem, selectedDef)
+
+const activeParams = computed(() => {
+  const t = selectedToolType.value
+  if (t === 'blob') return blobParams.value
+  if (t === 'grayscale') return {
+    method: getParam('method', 'luminance'),
+    normalize: !!getParam('normalize', false)
+  }
+  if (t === 'blur') return {
+    method: getParam('method', 'gaussian'),
+    ksize: toNumber(getParam('ksize', 3)),
+    sigma: toFloat(getParam('sigma', 0))
+  }
+  if (t === 'threshold') return {
+    mode: getParam('mode', 'binary'),
+    th_min: toNumber(getParam('th_min', 0)),
+    th_max: toNumber(getParam('th_max', 255))
+  }
+  if (t === 'morphology') return {
+    kernel: toNumber(getParam('kernel', 3)),
+    open: toNumber(getParam('open', 0)),
+    close: toNumber(getParam('close', 0)),
+    shape: String(getParam('shape', 'ellipse'))
+  }
+  if (t === 'math') return {
+    operation: String(getParam('operation', '')),
+    reference_tool_id: toNumber(getParam('reference_tool_id', null)),
+    custom_formula: String(getParam('custom_formula', ''))
+  }
+  return {}
+})
+
+function onParamsUpdate({ key, value }) {
+  if (selectedToolType.value === 'blob') {
+    updateBlobParam(key, value)
+  } else {
+    emitParam(key, value)
+  }
+}
+
+// seleção de tipo agora via selectedToolType
+
+// listas de opções movidas para ToolParamsPanel
+
+// getParam agora fornecido por useToolParams
+
+function emitParam(key, value) {
+  if (props.readOnly) return
+  if (selectedIndex.value < 0) return
+  emit('update-tool-param', { index: selectedIndex.value, key, value })
+}
 </script>
 
 <style scoped>

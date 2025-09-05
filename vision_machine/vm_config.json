@@ -11,31 +11,78 @@
         "name": "filtro_cinza",
         "type": "grayscale",
         "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
-        }
+          "shape": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 752,
+            "h": 480
+          }
+        },
+        "inspec_pass_fail": false,
+        "method": "luminance",
+        "normalize": false
       },
       {
         "order_index": 1,
         "name": "blob_2",
         "type": "blob",
         "ROI": {
-          "x": 140,
-          "y": 32,
-          "w": 423,
-          "h": 405
+          "shape": "rect",
+          "rect": {
+            "x": 223,
+            "y": 32,
+            "w": 293,
+            "h": 198
+          }
         },
-        "th_min": 0,
+        "inspec_pass_fail": true,
+        "th_min": 30,
         "th_max": 255,
         "area_min": 1000,
-        "area_max": 2000
+        "area_max": 2000,
+        "total_area_test": false,
+        "blob_count_test": true,
+        "test_total_area_min": 50,
+        "test_total_area_max": 10000,
+        "test_blob_count_min": 4,
+        "test_blob_count_max": 4,
+        "contour_chain": "TC89_KCOS",
+        "approx_epsilon_ratio": 0.003,
+        "polygon_max_points": 1000
+      },
+      {
+        "order_index": 2,
+        "name": "blob_3",
+        "type": "blob",
+        "ROI": {
+          "shape": "rect",
+          "rect": {
+            "x": 218,
+            "y": 236,
+            "w": 293,
+            "h": 198
+          }
+        },
+        "inspec_pass_fail": true,
+        "th_min": 30,
+        "th_max": 255,
+        "area_min": 1000,
+        "area_max": 2000,
+        "total_area_test": false,
+        "blob_count_test": true,
+        "test_total_area_min": 50,
+        "test_total_area_max": 10000,
+        "test_blob_count_min": 4,
+        "test_blob_count_max": 4,
+        "contour_chain": "TC89_KCOS",
+        "approx_epsilon_ratio": 0.003,
+        "polygon_max_points": 1000
       }
     ],
     "source_config": {
       "type": "pasta",
-      "folder_path": "./test_images",
+      "folder_path": "./testBlob_images",
       "fps": 30,
       "resolution": [
         752,
@@ -43,7 +90,8 @@
       ]
     },
     "trigger_config": {
-      "type": "trigger"
+      "type": "continuous",
+      "interval_ms": 1000
     }
   },
   "source_config": {
@@ -54,14 +102,14 @@
       480
     ],
     "fps": 30,
-    "folder_path": "./test_images",
+    "folder_path": "./testBlob_images",
     "rtsp_url": ""
   },
   "trigger_config": {
-    "type": "trigger",
+    "type": "continuous",
     "interval_ms": 1000
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-04T20:45:08.272112"
+  "last_saved": "2025-09-05T02:42:49.516915"
 }

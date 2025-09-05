@@ -47,10 +47,11 @@
                         :ratio="liveRatio"
                         :results="liveTools"
                         :tool-defs="liveToolDefs"
-                        :tools="liveToolDefs"
+                        :tools="toolsItems"
                         :resolution="liveResolution"
                         :metrics="metrics"
                         :editable="true"
+                        :read-only="false"
                         fit="contain"
                         @select="onSelectTool"
                         @update-tool-roi="onUpdateToolRoi"
@@ -311,11 +312,36 @@ watch(selectedInspectionId, async (inspId) => {
       order_index: Number(t.order_index ?? i),
       name: t.name,
       type: String(t.type || '').toLowerCase(),
-      ROI: normalizeROI(t.ROI),
+      // Preserva ROI com shape quando existir; fallback para retângulo simples
+      ROI: t.ROI && (t.ROI.shape || t.ROI.rect || t.ROI.circle || t.ROI.ellipse)
+        ? t.ROI
+        : { shape: 'rect', rect: normalizeROI(t.ROI) },
+      inspec_pass_fail: !!t.inspec_pass_fail,
+      method: t.method,
+      normalize: t.normalize,
+      ksize: t.ksize,
+      sigma: t.sigma,
+      mode: t.mode,
       th_min: t.th_min,
       th_max: t.th_max,
+      kernel: t.kernel,
+      open: t.open,
+      close: t.close,
+      shape: t.shape,
       area_min: t.area_min,
-      area_max: t.area_max
+      area_max: t.area_max,
+      total_area_test: t.total_area_test,
+      blob_count_test: t.blob_count_test,
+      test_total_area_min: t.test_total_area_min,
+      test_total_area_max: t.test_total_area_max,
+      test_blob_count_min: t.test_blob_count_min,
+      test_blob_count_max: t.test_blob_count_max,
+      contour_chain: t.contour_chain,
+      approx_epsilon_ratio: t.approx_epsilon_ratio,
+      polygon_max_points: t.polygon_max_points,
+      operation: t.operation,
+      reference_tool_id: t.reference_tool_id,
+      custom_formula: t.custom_formula
     }))
   } catch {
     toolsItems.value = []
@@ -328,6 +354,23 @@ function normalizeROI(r) {
   const w = Number(r?.rect?.w ?? r?.w ?? 0)
   const h = Number(r?.rect?.h ?? r?.h ?? 0)
   return { x, y, w, h }
+}
+
+function normalizeROIForSave(roi) {
+  if (!roi || typeof roi !== 'object') return {}
+  const out = { shape: roi.shape || undefined }
+  if (roi.shape === 'rect' || (!roi.shape && 'x' in roi && 'y' in roi && 'w' in roi && 'h' in roi)) {
+    const r = roi.rect || roi
+    out.shape = 'rect'
+    out.rect = { x: Number(r.x)||0, y: Number(r.y)||0, w: Number(r.w)||0, h: Number(r.h)||0 }
+  } else if (roi.shape === 'circle' && roi.circle) {
+    out.shape = 'circle'
+    out.circle = { cx: Number(roi.circle.cx)||0, cy: Number(roi.circle.cy)||0, r: Number(roi.circle.r)||0 }
+  } else if (roi.shape === 'ellipse' && roi.ellipse) {
+    out.shape = 'ellipse'
+    out.ellipse = { cx: Number(roi.ellipse.cx)||0, cy: Number(roi.ellipse.cy)||0, rx: Number(roi.ellipse.rx)||0, ry: Number(roi.ellipse.ry)||0, angle: Number(roi.ellipse.angle)||0 }
+  }
+  return out
 }
 
 let applyTimer = null
@@ -407,11 +450,33 @@ async function applyToVM() {
         order_index: Number(t.order_index ?? 0),
         name: t.name,
         type: t.type,
-        ROI: { x: Number(t.ROI?.x||0), y: Number(t.ROI?.y||0), w: Number(t.ROI?.w||0), h: Number(t.ROI?.h||0) },
+        ROI: normalizeROIForSave(t.ROI),
+        inspec_pass_fail: !!t.inspec_pass_fail,
+        method: t.method,
+        normalize: t.normalize,
+        ksize: t.ksize,
+        sigma: t.sigma,
+        mode: t.mode,
         th_min: t.th_min,
         th_max: t.th_max,
+        kernel: t.kernel,
+        open: t.open,
+        close: t.close,
+        shape: t.shape,
         area_min: t.area_min,
-        area_max: t.area_max
+        area_max: t.area_max,
+        total_area_test: t.total_area_test,
+        blob_count_test: t.blob_count_test,
+        test_total_area_min: t.test_total_area_min,
+        test_total_area_max: t.test_total_area_max,
+        test_blob_count_min: t.test_blob_count_min,
+        test_blob_count_max: t.test_blob_count_max,
+        contour_chain: t.contour_chain,
+        approx_epsilon_ratio: t.approx_epsilon_ratio,
+        polygon_max_points: t.polygon_max_points,
+        operation: t.operation,
+        reference_tool_id: t.reference_tool_id,
+        custom_formula: t.custom_formula
       }))
     }
     const res = await apiFetch(`/api/inspections/${selectedInspectionId.value}/update_vm`, {
@@ -439,11 +504,14 @@ function onSelectTool(payload) {
 function onUpdateToolRoi({ index, roi, name }) {
   const t = toolsItems.value.find((it, i) => (i === index) || (name && it.name === name))
   if (!t) return
-  t.ROI = {
-    x: Number(roi?.x || 0),
-    y: Number(roi?.y || 0),
-    w: Number(roi?.w || 0),
-    h: Number(roi?.h || 0)
+  // Permite receber ROI com shape (rect/circle/ellipse) ou bounding box
+  if (roi && typeof roi === 'object' && (roi.shape || roi.rect || roi.circle || roi.ellipse)) {
+    t.ROI = { ...roi }
+  } else {
+    t.ROI = {
+      shape: 'rect',
+      rect: { x: Number(roi?.x || 0), y: Number(roi?.y || 0), w: Number(roi?.w || 0), h: Number(roi?.h || 0) }
+    }
   }
   scheduleApplyToVM()
 }
@@ -466,5 +534,3 @@ onBeforeUnmount(() => { try { if (sio) sio.disconnect() } catch {} sio = null })
 .opacity-75 { opacity: 0.75; }
 .live-row .aovivoimg .frame-wrapper { min-height: 320px; }
 </style>
-
-
