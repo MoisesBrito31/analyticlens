@@ -15,7 +15,7 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
   - Emite eventos para o pai (seleção de tool e atualização de parâmetros).
 - `RoiOverlay.vue`
   - Renderiza, em SVG, o ROI (retângulo, círculo, elipse) e elementos de análise dos blobs (centróides, caixas e contornos).
-  - Nota: a edição/desenho do ROI pode ser reintroduzida aqui futuramente. Hoje o overlay é puramente visual.
+  - Suporta edição interativa do ROI: arrasto para mover e handles para redimensionar (retângulo/círculo/elipse). Pressione Shift para ajuste fino. Opções: `dragGain` (ganho), `snapToGrid` e `gridStep`.
 - `TimelineDots.vue`
   - Mostra 60 marcadores (configurável) representando pass/fail/unknown dos últimos frames.
 - `MetricsPanel.vue`
@@ -23,6 +23,8 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
 - `ToolParamsPanel.vue`
   - Escolhe dinamicamente qual subpainel de parâmetros renderizar conforme o tipo da tool.
   - Subcomponentes em `components/tool-params/`: `BlobParams.vue`, `GrayscaleParams.vue`, `BlurParams.vue`, `ThresholdParams.vue`, `MorphologyParams.vue`, `MathParams.vue`.
+- `ToolCardsPanel.vue`
+  - Lista de ferramentas (cards) com seleção e suporte a drag-and-drop para reordenar.
 - Composables
   - `useToolParams`
     - Fornece `getParam` e `selectedToolType` a partir do item selecionado e da definição da tool.
@@ -56,6 +58,8 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
   - Emitido ao selecionar/deselecionar um card de tool.
 - `update-tool-param: ({ index, key, value })`
   - Emitido ao alterar algum parâmetro da tool selecionada. O pai (ex.: `InspectionEditOnlineView`) deve consolidar e enviar o payload para o backend (update_vm) de forma debounced.
+  - Quando `key === 'ROI'`, o `value` segue o formato tipado `{ shape: 'rect'|'circle'|'ellipse', rect|circle|ellipse: {...} }`.
+  - Reordenação: `key === 'REORDER'` com `value = { from, to, order }`, onde `order` é a nova lista de ids das tools.
 
 ## Fluxo de dados (resumo)
 
@@ -71,7 +75,7 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
 
 ## Detalhes por seção
 
-### Imagem e overlays
+### Imagem, overlays e edição de ROI
 
 - O frame é exibido como `<img />` com `object-fit` configurável por `fit`.
 - O overlay é um SVG com `viewBox` baseado em `resolution` e desenha:
@@ -79,7 +83,24 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
   - Centrôides dos blobs
   - Caixas (bounding boxes) dos blobs
   - Contornos/polígonos dos blobs
-- Hoje o overlay é somente visual. A reintrodução da edição/desenho de ROI deve ser feita em `RoiOverlay.vue` (fácil isolar eventos e converter coordenadas).
+- Edição de ROI: pode ser feita pelo overlay (drag/handles) ou pela aba Parâmetros (campos numéricos). Mudanças refletem imediatamente no overlay e são emitidas ao pai como `update-tool-param` (key `ROI`).
+
+### ToolCardsPanel: adicionar, reordenar, duplicar e apagar
+
+- Localização: abaixo da imagem, à esquerda.
+- Adicionar tool: card “+” abre modal com tipos disponíveis; ao escolher, o `AoVivoImg` emite `update-tool-param` com `key: 'ADD_TOOL'` e o objeto base da ferramenta. A view hospedeira inclui a tool no fim da lista e chama `update_vm`.
+- Reordenar: botão “Reordenar” abre um modal com:
+  - Painéis fixos indicando a posição da fila (rótulo “1º, 2º, …” no canto superior direito);
+  - Dentro de cada painel, um quadrado menor arrastável representando a tool (nome e tipo);
+  - Botões por painel: “×” (apagar) e “⧉” (duplicar). As ações afetam somente a visualização do modal; nada é aplicado até o OK.
+  - Durante o arrasto, o item original fica invisível e um ghost segue o cursor.
+  - Ao clicar em OK, o componente emite um plano consolidado para composição da lista:
+    - `INSPECTION_REORDER` via `update-tool-param` com `value = { orderIndexes, deleteIndexes, composePlan }` onde:
+      - `composePlan`: sequência completa da visualização com steps `{ kind: 'orig' | 'dup', index, name, type }`;
+      - `deleteIndexes`: índices originais a serem removidos;
+      - `orderIndexes`: ordem final referenciando posições dentro de `composePlan`.
+- A view hospedeira aplica: primeiro `deleteIndexes`, depois cria cópias profundas para steps `dup` (ajustando `name`), constrói a sequência final conforme `orderIndexes`, reatribui `order_index` e chama `update_vm`.
+- Modo somente leitura: quando `readOnly === true`, os botões “Adicionar” e “Reordenar” ficam desativados (visualmente e funcionalmente).
 
 ### Timeline
 
@@ -100,6 +121,9 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
   - `test_blob_count_min`, `test_blob_count_max`
   - `contour_chain`, `approx_epsilon_ratio`, `polygon_max_points`
 - Todos os subpainéis emitem um evento de mudança normalizado para o `ToolParamsPanel`, que por sua vez emite `update` ao `AoVivoImg`; então o `AoVivoImg` emite `update-tool-param` para o pai.
+- Campo Geral → Nome da ferramenta:
+  - Editável na aba de Parâmetros; aplica normalização automática: remove acentos, substitui espaços/símbolos por `_`, colapsa underscores e faz trim;
+  - Unicidade: nomes duplicados são bloqueados; mensagem de erro em vermelho é exibida e nenhuma atualização é emitida até o nome ficar válido.
 - Em modo `readOnly=true`, os campos ficam desabilitados (somente leitura); o `inspec_pass_fail` também aparece em leitura.
 
 ### Composables
@@ -143,7 +167,17 @@ function onSelectTool(payload) {
 }
 
 function onUpdateToolParam({ index, key, value }) {
-  // Atualize o estado local e agende um apply para a VM (debounce)
+  if (key === 'ROI') {
+    // persistir ROI da tool index na VM (debounced)
+  } else if (key === 'ADD_TOOL') {
+    // append e enviar recipe completa
+  } else if (key === 'INSPECTION_REORDER') {
+    // aplicar deleteIndexes, duplicações de composePlan e orderIndexes; enviar recipe completa
+  } else if (key === 'name') {
+    // já vem normalizado; garantir unicidade antes de enviar
+  } else {
+    // outros parâmetros por tool
+  }
 }
 </script>
 ```

@@ -56,6 +56,7 @@
                         @select="onSelectTool"
                         @update-tool-roi="onUpdateToolRoi"
                         @update-tool-param="onUpdateToolParam"
+                        @update-inspection-config="onUpdateInspectionConfig"
                       />
                     </BCol>
                   </BRow>
@@ -161,6 +162,8 @@ const liveMime = ref('image/jpeg')
 const liveRatio = ref('16/9')
 const liveTools = ref([])
 const liveToolDefs = ref([])
+// Quando true, prioriza a receita vinda da VM (WS) ao entrar na edição online
+const vmConfigApplied = ref(false)
 const liveResolution = ref([])
 const metrics = ref({ aprovados: 0, reprovados: 0, time: '', frame: 0 })
 let sio = null
@@ -286,6 +289,46 @@ function connectWebSocket() {
       }
       if (Array.isArray(data?.tools)) {
         liveToolDefs.value = data.tools
+        // Se ainda não aplicamos a configuração da VM na edição online, faça agora
+        if (!vmConfigApplied.value && Array.isArray(data.tools) && data.tools.length > 0) {
+          try {
+            toolsItems.value = data.tools.map((t, i) => ({
+              order_index: Number(t.order_index ?? i),
+              name: t.name,
+              type: String(t.type || '').toLowerCase(),
+              ROI: t.ROI && (t.ROI.shape || t.ROI.rect || t.ROI.circle || t.ROI.ellipse)
+                ? t.ROI
+                : { shape: 'rect', rect: normalizeROI(t.ROI) },
+              inspec_pass_fail: !!t.inspec_pass_fail,
+              method: t.method,
+              normalize: t.normalize,
+              ksize: t.ksize,
+              sigma: t.sigma,
+              mode: t.mode,
+              th_min: t.th_min,
+              th_max: t.th_max,
+              kernel: t.kernel,
+              open: t.open,
+              close: t.close,
+              shape: t.shape,
+              area_min: t.area_min,
+              area_max: t.area_max,
+              total_area_test: t.total_area_test,
+              blob_count_test: t.blob_count_test,
+              test_total_area_min: t.test_total_area_min,
+              test_total_area_max: t.test_total_area_max,
+              test_blob_count_min: t.test_blob_count_min,
+              test_blob_count_max: t.test_blob_count_max,
+              contour_chain: t.contour_chain,
+              approx_epsilon_ratio: t.approx_epsilon_ratio,
+              polygon_max_points: t.polygon_max_points,
+              operation: t.operation,
+              reference_tool_id: t.reference_tool_id,
+              custom_formula: t.custom_formula
+            }))
+            vmConfigApplied.value = true
+          } catch {}
+        }
       }
       metrics.value = {
         aprovados: data?.aprovados,
@@ -303,6 +346,8 @@ function connectWebSocket() {
 const toolsItems = ref([])
 watch(selectedInspectionId, async (inspId) => {
   toolsItems.value = []
+  // Se já recebemos a configuração da VM nesta sessão, não sobrescrever com memória do backend
+  if (vmConfigApplied.value) return
   if (!inspId) return
   try {
     const res = await apiFetch(`/api/inspections/${inspId}`)
@@ -517,11 +562,139 @@ function onUpdateToolRoi({ index, roi, name }) {
 }
 
 function onUpdateToolParam({ index, key, value, name }) {
+  // Reordenar via modal (ordem por índices)
+  if (key === 'INSPECTION_REORDER' && value && Array.isArray(value.orderIndexes)) {
+    const order = value.orderIndexes
+    const plan = Array.isArray(value.composePlan) ? value.composePlan : []
+    const dels = Array.isArray(value.deleteIndexes) ? value.deleteIndexes.slice().sort((a,b)=>b-a) : []
+
+    // pool inicial = lista atual após exclusões
+    let pool = toolsItems.value.slice()
+    for (const di of dels) {
+      if (di >= 0 && di < pool.length) pool.splice(di, 1)
+    }
+
+    // construir sequência seq a partir do composePlan: orig pega de pool, dup copia de pool
+    const seq = []
+    const makeCopy = (src, step) => {
+      const c = JSON.parse(JSON.stringify(src))
+      c.name = step?.name || `${src.name}_copy`
+      return c
+    }
+    for (const step of plan) {
+      if (!step || typeof step.index !== 'number') continue
+      const src = pool[step.index]
+      if (!src) continue
+      seq.push(step.kind === 'dup' ? makeCopy(src, step) : src)
+    }
+
+    // order refere-se às posições em seq
+    const newArr = order.map(i => seq[i]).filter(Boolean).map((t, i) => ({ ...t, order_index: i }))
+    if (newArr.length === order.length) {
+      toolsItems.value = newArr
+      applyToVM()
+    }
+    return
+  }
+  // Adição de nova tool via AoVivoImg
+  if (key === 'ADD_TOOL' && value && typeof value === 'object') {
+    const i = Array.isArray(toolsItems.value) ? toolsItems.value.length : 0
+    const nt = {
+      order_index: Number(value.order_index ?? i),
+      name: value.name || `tool_${i+1}`,
+      type: String(value.type || '').toLowerCase(),
+      ROI: normalizeROIForSave(value.ROI || { shape: 'rect', rect: { x: 0, y: 0, w: 100, h: 100 } }),
+      inspec_pass_fail: !!value.inspec_pass_fail,
+      method: value.method,
+      normalize: value.normalize,
+      ksize: value.ksize,
+      sigma: value.sigma,
+      mode: value.mode,
+      th_min: value.th_min,
+      th_max: value.th_max,
+      kernel: value.kernel,
+      open: value.open,
+      close: value.close,
+      shape: value.shape,
+      area_min: value.area_min,
+      area_max: value.area_max,
+      total_area_test: value.total_area_test,
+      blob_count_test: value.blob_count_test,
+      test_total_area_min: value.test_total_area_min,
+      test_total_area_max: value.test_total_area_max,
+      test_blob_count_min: value.test_blob_count_min,
+      test_blob_count_max: value.test_blob_count_max,
+      contour_chain: value.contour_chain,
+      approx_epsilon_ratio: value.approx_epsilon_ratio,
+      polygon_max_points: value.polygon_max_points,
+      operation: value.operation,
+      reference_tool_id: value.reference_tool_id,
+      custom_formula: value.custom_formula
+    }
+    toolsItems.value = [...toolsItems.value, nt]
+    applyToVM()
+    return
+  }
   const t = toolsItems.value.find((it, i) => (i === index) || (name && it.name === name))
   if (!t) return
+  if (key === 'name') {
+    let nv = String(value || '').trim()
+    // normalização igual ao painel: remove acentos e caracteres inválidos
+    nv = nv
+      .normalize('NFD').replace(/\p{Diacritic}+/gu, '')
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+    if (!nv) return
+    const already = toolsItems.value.some((it, i) => i !== index && String(it.name) === nv)
+    if (already) return
+    t.name = nv
+    applyToVM()
+    return
+  }
   t[key] = value
   scheduleApplyToVM()
 }
+
+function onUpdateInspectionConfig(full) {
+  if (!full || !Array.isArray(full.tools)) return
+  toolsItems.value = full.tools.map((t, i) => ({
+    order_index: Number(t.order_index ?? i),
+    name: t.name,
+    type: String(t.type || '').toLowerCase(),
+    ROI: t.ROI,
+    inspec_pass_fail: !!t.inspec_pass_fail,
+    method: t.method,
+    normalize: t.normalize,
+    ksize: t.ksize,
+    sigma: t.sigma,
+    mode: t.mode,
+    th_min: t.th_min,
+    th_max: t.th_max,
+    kernel: t.kernel,
+    open: t.open,
+    close: t.close,
+    shape: t.shape,
+    area_min: t.area_min,
+    area_max: t.area_max,
+    total_area_test: t.total_area_test,
+    blob_count_test: t.blob_count_test,
+    test_total_area_min: t.test_total_area_min,
+    test_total_area_max: t.test_total_area_max,
+    test_blob_count_min: t.test_blob_count_min,
+    test_blob_count_max: t.test_blob_count_max,
+    contour_chain: t.contour_chain,
+    approx_epsilon_ratio: t.approx_epsilon_ratio,
+    polygon_max_points: t.polygon_max_points,
+    operation: t.operation,
+    reference_tool_id: t.reference_tool_id,
+    custom_formula: t.custom_formula
+  }))
+  scheduleApplyToVM()
+}
+
+// Removido: update-inspection-config
 
 onMounted(loadInitial)
 onBeforeUnmount(() => { try { if (sio) sio.disconnect() } catch {} sio = null })

@@ -1,6 +1,16 @@
 <template>
   <FormKit type="form" :actions="false">
     <div class="form-section">
+      <div class="section-title">Geral</div>
+      <div class="row g-2 mb-2">
+        <div class="col-12 col-md-6">
+          <FormKit type="text" :label="'Nome da ferramenta'" :disabled="readOnly"
+            :model-value="toolName" @input="onNameInput" />
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="small mt-4 name-error" v-if="nameError">{{ nameError }}</div>
+        </div>
+      </div>
       <div class="section-title">Região de Interesse (ROI)</div>
       <div class="row g-2 mb-2">
         <div class="col-12 col-md-6">
@@ -56,7 +66,9 @@ const props = defineProps({
   type: { type: String, default: '' },
   params: { type: Object, default: () => ({}) },
   readOnly: { type: Boolean, default: true },
-  roi: { type: Object, default: null }
+  roi: { type: Object, default: null },
+  allNames: { type: Array, default: () => [] },
+  currentName: { type: String, default: '' }
 })
 const emit = defineEmits(['update'])
 
@@ -92,6 +104,29 @@ const mathOps = [
 ]
 
 const normalizedType = computed(() => String(props.type || '').toLowerCase())
+
+const toolName = ref('')
+const nameError = ref('')
+watch(() => props.currentName, (v) => { toolName.value = String(v || '') }, { immediate: true })
+function onNameInput(val) {
+  if (props.readOnly) return
+  let nv = typeof val === 'string' ? val : val?.target?.value
+  // normalizar: remover acentos, manter [a-zA-Z0-9_], trocar espaços por underscore, colapsar múltiplos _
+  nv = String(nv || '')
+    .normalize('NFD').replace(/\p{Diacritic}+/gu, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  toolName.value = nv
+  // validação de unicidade
+  const exists = (props.allNames || []).filter(n => String(n) === String(nv))
+  const isDuplicate = exists.length > 0 && String(nv) !== String(props.currentName)
+  nameError.value = isDuplicate ? 'Nome já utilizado. Escolha outro.' : ''
+  if (!isDuplicate && nv && nv.trim()) {
+    emit('update', { key: 'name', value: nv })
+  }
+}
 
 const shapeOptions = [
   { value: 'rect', label: 'retângulo' },
@@ -175,4 +210,8 @@ const extraProps = computed(() => {
 function onChange({ key, value }) {
   emit('update', { key, value })
 }
-</script>
+ </script>
+
+<style scoped>
+.name-error { color: #dc3545; }
+</style>

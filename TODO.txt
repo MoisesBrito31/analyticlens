@@ -92,15 +92,15 @@ VM (Vision Machine - Servidor Flask)
 
 Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
 
-- (FE 6) [>] Edição de inspeção em modo ao vivo (modificações refletidas imediatamente)
+- (FE 6) [X] Edição de inspeção em modo ao vivo (modificações refletidas imediatamente)
   - (VM 5) [X] VM: aplicar mudanças de configuração em tempo real; emitir eventos Socket.IO de confirmação/erro
     - (BE 4) [X] Orquestrador (Django): endpoint para propagar atualizações (PUT /api/inspection_config); validações e permissões
       - (FE 6) [X] Frontend: UI de edição ao vivo com feedback (loading/erro), updates otimistas e rollback
       - (    ) [X] atualização para componente aovivoimg possa ser usado tanto para visualizar como editar 
       - (    ) [X] refatoração do Componente aovivoimg pois sua complexidade ficou muito alta
-      - (    ) [ ] adicionar função de reodernar ferramentas
-      - (    ) [ ] adicionar função de adicionar ferramentas novas, apagar e duplicar
-      - (    ) [ ] permitir alterar nome de ferramenta se procupando em que este seja unico
+      - (    ) [x] adicionar função de reodernar ferramentas
+      - (    ) [X] adicionar função de adicionar ferramentas novas, apagar e duplicar
+      - (    ) [X] permitir alterar nome de ferramenta se procupando em que este seja unico
       - (    ) [X] adicionar edição de shapes do ROI de ferramentas     
         - (QA 3) [ ] QA/Docs: testes de integração FE↔BE↔VM; documentar fluxo e payloads
 

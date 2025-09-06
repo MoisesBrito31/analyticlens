@@ -39,7 +39,11 @@
           class="mt-3"
           :items="displayItems"
           :selected-index="selectedIndex"
+          :read-only="props.readOnly"
           @select="onSelectCard"
+          @add-tool="onAddTool"
+          @reorder="onReorderExternal"
+          @delete-tool="onDeleteTool"
         />
       </div>
       <div class="right">
@@ -114,6 +118,8 @@
                 :params="activeParams"
                 :read-only="props.readOnly"
                 :roi="selectedRoiShape"
+                :all-names="displayItems.map(t => t?.name || t?.tool_name || '')"
+                :current-name="selectedItem?.name || selectedItem?.tool_name || ''"
                 @update="onParamsUpdate"
               />
             </div>
@@ -230,7 +236,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select', 'update-tool-param'])
+const emit = defineEmits(['select', 'update-tool-param', 'update-inspection-config'])
 
 const imageUrl = ref('')
 let objectUrl = ''
@@ -239,6 +245,11 @@ const selectedRoi = ref(null)
 const selectedRoiShape = ref(null)
 const hasAutoSelected = ref(false)
 const isEditingEnabled = computed(() => !props.readOnly && !!selectedRoiShape.value)
+
+// Debug JSONs
+const lastSentJson = ref('')
+const lastReceivedJson = ref('')
+
 
 const aspectRatio = computed(() => {
   if (typeof props.ratio === 'number') return String(props.ratio)
@@ -254,6 +265,8 @@ const displayItems = computed(() => {
   if (Array.isArray(props.results) && props.results.length) return props.results
   return Array.isArray(props.tools) ? props.tools : []
 })
+
+// Removido reorder otimista: a ordem deve refletir estritamente o JSON recebido
 
 const baseWidth = computed(() => Array.isArray(props.resolution) ? Number(props.resolution[0]) || 0 : 0)
 const baseHeight = computed(() => Array.isArray(props.resolution) ? Number(props.resolution[1]) || 0 : 0)
@@ -333,6 +346,12 @@ watch(() => props.binary, (val) => {
       setFromBlob(blob)
     }
   }
+}, { immediate: true })
+
+// Atualiza JSON recebido (somente tools/results) sempre que props mudarem
+watch([() => props.tools, () => props.results], () => {
+  const recv = { tools: props.tools || [], results: props.results || [] }
+  try { lastReceivedJson.value = JSON.stringify(recv, null, 2) } catch { lastReceivedJson.value = String(recv) }
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -441,6 +460,105 @@ function extractPassFail(item) {
   return undefined
 }
 
+// Constrói JSON completo da inspeção a partir dos itens atuais
+function buildInspectionPayload(overrides = {}) {
+  // Fonte na ordem atual
+  const src = displayItems.value || []
+  // Reordenar por ids se informado
+  let toolsOrdered = src
+  // Se uma lista já ordenada for fornecida, usa diretamente
+  if (Array.isArray(overrides.toolsOrdered) && overrides.toolsOrdered.length) {
+    toolsOrdered = overrides.toolsOrdered
+  }
+  if (Array.isArray(overrides.order) && overrides.order.length) {
+    const idOf = (it) => it?.tool_id ?? it?.id
+    const mapById = new Map(src.map(it => [idOf(it), it]))
+    toolsOrdered = overrides.order.map(id => mapById.get(id)).filter(Boolean)
+  }
+
+  const getVal = (it, def, key, fallback) => {
+    const v = it?.[key]
+    if (v !== undefined) return v
+    const dv = def?.[key]
+    if (dv !== undefined) return dv
+    return fallback
+  }
+
+  const pickCalibration = (obj, keys) => {
+    const out = {}
+    for (const k of keys) {
+      if (obj[k] !== undefined) out[k] = obj[k]
+    }
+    return out
+  }
+
+  const resultTools = toolsOrdered.map((it, idx) => {
+    const def = findToolDefForItem(it) || {}
+    const id = getVal(it, def, 'id', idx)
+    const name = getVal(it, def, 'name', getVal(it, def, 'tool_name', `tool_${id}`))
+    const type = String(getVal(it, def, 'type', getVal(it, def, 'tool_type', ''))).toLowerCase()
+    const base = { id, name, type, order_index: idx }
+    // ROI
+    if (overrides.applyRoiAtIndex === idx && overrides.roiValue) {
+      base.ROI = overrides.roiValue
+    } else {
+      const shapeObj = extractRoiShape(it) || extractRoiShape(def)
+      if (shapeObj) base.ROI = shapeObj
+    }
+    // Campos comuns
+    base.inspec_pass_fail = !!getVal(it, def, 'inspec_pass_fail', false)
+    base.reference_tool_id = getVal(it, def, 'reference_tool_id', null)
+
+    // Params por tipo (enviar todos, com defaults onde fizer sentido)
+    if (type === 'blob') {
+      base.th_min = Number(getVal(it, def, 'th_min', 0))
+      base.th_max = Number(getVal(it, def, 'th_max', 255))
+      base.area_min = Number(getVal(it, def, 'area_min', 0))
+      base.area_max = Number(getVal(it, def, 'area_max', 1e12))
+      base.total_area_test = !!getVal(it, def, 'total_area_test', false)
+      base.blob_count_test = !!getVal(it, def, 'blob_count_test', false)
+      base.test_total_area_min = Number(getVal(it, def, 'test_total_area_min', 0))
+      base.test_total_area_max = Number(getVal(it, def, 'test_total_area_max', 1e12))
+      base.test_blob_count_min = Number(getVal(it, def, 'test_blob_count_min', 0))
+      base.test_blob_count_max = Number(getVal(it, def, 'test_blob_count_max', 1000000))
+      base.pre_blur = String(getVal(it, def, 'pre_blur', '')) || null
+      base.pre_blur_ksize = Number(getVal(it, def, 'pre_blur_ksize', 3))
+      base.pre_blur_sigma = Number(getVal(it, def, 'pre_blur_sigma', 0))
+      base.morph_kernel = Number(getVal(it, def, 'morph_kernel', 3))
+      base.morph_open = Number(getVal(it, def, 'morph_open', 0))
+      base.morph_close = Number(getVal(it, def, 'morph_close', 0))
+      base.use_range_threshold = !!getVal(it, def, 'use_range_threshold', false)
+      base.use_otsu = !!getVal(it, def, 'use_otsu', false)
+      base.contour_chain = String(getVal(it, def, 'contour_chain', 'SIMPLE')).toUpperCase()
+      base.approx_epsilon_ratio = Number(getVal(it, def, 'approx_epsilon_ratio', 0))
+      base.polygon_max_points = Number(getVal(it, def, 'polygon_max_points', 0))
+    } else if (type === 'grayscale') {
+      base.method = String(getVal(it, def, 'method', 'luminance'))
+      base.normalize = !!getVal(it, def, 'normalize', false)
+    } else if (type === 'blur') {
+      base.method = String(getVal(it, def, 'method', 'gaussian'))
+      base.ksize = Number(getVal(it, def, 'ksize', 3))
+      base.sigma = Number(getVal(it, def, 'sigma', 0))
+    } else if (type === 'threshold') {
+      base.mode = String(getVal(it, def, 'mode', 'binary'))
+      base.th_min = Number(getVal(it, def, 'th_min', 0))
+      base.th_max = Number(getVal(it, def, 'th_max', 255))
+    } else if (type === 'morphology') {
+      base.kernel = Number(getVal(it, def, 'kernel', 3))
+      base.open = Number(getVal(it, def, 'open', 0))
+      base.close = Number(getVal(it, def, 'close', 0))
+      base.shape = String(getVal(it, def, 'shape', 'ellipse'))
+    } else if (type === 'math') {
+      base.operation = String(getVal(it, def, 'operation', ''))
+      base.reference_tool_id = getVal(it, def, 'reference_tool_id', null)
+      base.custom_formula = String(getVal(it, def, 'custom_formula', ''))
+    }
+    return base
+  })
+
+  return { tools: resultTools }
+}
+
 function handleItemClick(item, idx) {
   let roi = extractRoi(item)
   let roiShape = extractRoiShape(item)
@@ -474,6 +592,8 @@ function onSelectCard(idx) {
   if (!item) return
   handleItemClick(item, idx)
 }
+
+// Removido: handlers de reordenação
 
 function isToolSelectedIdx(idx) {
   return selectedIndex.value === idx
@@ -985,8 +1105,17 @@ function onParamsUpdate({ key, value }) {
       selectedRoi.value = null
       selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...value.ellipse } }
     }
+    // Monta JSON completo e loga
+    const full = buildInspectionPayload({ applyRoiAtIndex: selectedIndex.value, roiValue: value })
+    try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
     // Propaga mudança para o pai para envio à VM
-    emitParam('ROI', value)
+    emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
+    if (selectedIndex.value < 0 && displayItems.value.length > 0) {
+      selectedIndex.value = 0
+    }
+    if (selectedIndex.value >= 0) {
+      emitParam('INSPECTION_CONFIG', full)
+    }
     return
   }
 
@@ -1006,7 +1135,9 @@ function onParamsUpdate({ key, value }) {
 function emitParam(key, value) {
   if (props.readOnly) return
   if (selectedIndex.value < 0) return
-  emit('update-tool-param', { index: selectedIndex.value, key, value })
+  const payload = { index: selectedIndex.value, key, value }
+  
+  emit('update-tool-param', payload)
 }
 
 function onRoiChange(newShape) {
@@ -1016,16 +1147,29 @@ function onRoiChange(newShape) {
   if (newShape?.shape === 'rect' && newShape.rect) {
     selectedRoi.value = { ...newShape.rect }
     selectedRoiShape.value = { shape: 'rect', rect: { ...newShape.rect } }
-    emit('update-tool-param', { index: selectedIndex.value, key: 'ROI', value: { shape: 'rect', rect: { ...newShape.rect } } })
+    emitParam('ROI', { shape: 'rect', rect: { ...newShape.rect } })
   } else if (newShape?.shape === 'circle' && newShape.circle) {
     selectedRoi.value = null
     selectedRoiShape.value = { shape: 'circle', circle: { ...newShape.circle } }
-    emit('update-tool-param', { index: selectedIndex.value, key: 'ROI', value: { shape: 'circle', circle: { ...newShape.circle } } })
+    emitParam('ROI', { shape: 'circle', circle: { ...newShape.circle } })
   } else if (newShape?.shape === 'ellipse' && newShape.ellipse) {
     selectedRoi.value = null
     selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...newShape.ellipse } }
-    emit('update-tool-param', { index: selectedIndex.value, key: 'ROI', value: { shape: 'ellipse', ellipse: { ...newShape.ellipse } } })
+    emitParam('ROI', { shape: 'ellipse', ellipse: { ...newShape.ellipse } })
   }
+}
+
+function onAddTool(newTool) {
+  // Encaminha para a view hospedeira adicionar no final
+  // Nesta emissão, index: -1 para indicar operação na lista e key: 'ADD_TOOL'
+  const payload = { index: -1, key: 'ADD_TOOL', value: newTool }
+  emit('update-tool-param', payload)
+}
+
+function onReorderExternal({ orderIndexes, deleteIndexes, composePlan }) {
+  if (!Array.isArray(orderIndexes)) return
+  // Emite para a view hospedeira a nova ordem e exclusões pendentes
+  emit('update-tool-param', { index: -1, key: 'INSPECTION_REORDER', value: { orderIndexes, deleteIndexes: Array.isArray(deleteIndexes) ? deleteIndexes : [], composePlan: Array.isArray(composePlan) ? composePlan : [] } })
 }
 </script>
 
@@ -1305,6 +1449,28 @@ function onRoiChange(newShape) {
   font-weight: 600;
   padding: 10px 12px;
   border-bottom: 1px solid #e9ecef;
+}
+
+.debug-jsons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 992px) {
+  .debug-jsons { grid-template-columns: 1fr 1fr; }
+}
+.debug-block { border: 1px solid #e9ecef; border-radius: 10px; background: #fff; }
+.debug-textarea {
+  width: 100%;
+  min-height: 160px;
+  border: 0;
+  outline: 0;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  background: #0b1520;
+  color: #cfe8ff;
+  border-radius: 0 0 10px 10px;
 }
 </style>
 
