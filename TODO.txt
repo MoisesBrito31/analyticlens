@@ -94,6 +94,8 @@ Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
 
 - (FE 6) [X] Edição de inspeção em modo ao vivo (modificações refletidas imediatamente)
   - (VM 5) [X] VM: aplicar mudanças de configuração em tempo real; emitir eventos Socket.IO de confirmação/erro
+    (    ) [X] VM: apois aplicação de edição online caso a vm esteja rodando source de picamera2 o componente responsável 
+      pela picamera2 gera falha.
     - (BE 4) [X] Orquestrador (Django): endpoint para propagar atualizações (PUT /api/inspection_config); validações e permissões
       - (FE 6) [X] Frontend: UI de edição ao vivo com feedback (loading/erro), updates otimistas e rollback
       - (    ) [X] atualização para componente aovivoimg possa ser usado tanto para visualizar como editar 

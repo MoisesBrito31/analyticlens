@@ -419,6 +419,12 @@ class TestModeProcessor:
                     continue
                 
                 # Verificar se image_source existe
+                # Se o source estiver em reconfiguração, aguardar e continuar
+                if hasattr(self.vm, 'source_reconfiguring') and self.vm.source_reconfiguring:
+                    logger.info("⏳ Aguardando reconfiguração do source...")
+                    time.sleep(0.05)
+                    continue
+
                 if not hasattr(self.vm, 'image_source') or self.vm.image_source is None:
                     error_message = "Source de imagem não disponível"
                     logger.error(f"❌ {error_message}")
@@ -662,6 +668,9 @@ class VisionMachine:
         
         # Carregar configurações salvas ou usar padrões
         self._load_config()
+        # Controle de reconfiguração do source (evitar corrida com o loop)
+        self.source_reconfiguring = False
+        self.source_lock = threading.Lock()
         
         # Inicializar source de imagem com tratamento de erro
         try:
@@ -792,51 +801,54 @@ class VisionMachine:
             logger.error(f"Erro ao salvar configurações em {self.config_file}: {str(e)}")
 
     def update_source_config(self, new_config: Dict[str, Any]):
-        """Atualiza configuração de source e salva"""
+        """Atualiza configuração de source e salva (com sincronização para evitar corrida)."""
         try:
-            # Atualizar configuração
-            self.source_config.update(new_config)
-            
-            # Atualizar source de imagem se existir
-            if hasattr(self, 'image_source') and self.image_source is not None:
-                try:
-                    self.image_source.update_config(self.source_config)
-                    logger.info("✅ Source de imagem atualizado com sucesso")
-                except Exception as update_error:
-                    logger.warning(f"⚠️ Erro ao atualizar source existente, tentando recriar: {str(update_error)}")
-                    # Tentar recriar o source
+            self.source_reconfiguring = True
+            with self.source_lock:
+                # Atualizar configuração
+                self.source_config.update(new_config)
+                
+                # Atualizar source de imagem se existir
+                if hasattr(self, 'image_source') and self.image_source is not None:
+                    try:
+                        self.image_source.update_config(self.source_config)
+                        logger.info("✅ Source de imagem atualizado com sucesso")
+                    except Exception as update_error:
+                        logger.warning(f"⚠️ Erro ao atualizar source existente, tentando recriar: {str(update_error)}")
+                        # Tentar recriar o source
+                        try:
+                            self.image_source = ImageSource(self.source_config)
+                            logger.info("✅ Source de imagem recriado com sucesso")
+                        except Exception as recreate_error:
+                            error_message = f"Erro ao recriar source de imagem: {str(recreate_error)}"
+                            logger.error(f"❌ {error_message}")
+                            self.set_error(error_message)
+                            raise Exception(error_message)
+                else:
+                    # Tentar criar novo source se não existir
                     try:
                         self.image_source = ImageSource(self.source_config)
-                        logger.info("✅ Source de imagem recriado com sucesso")
-                    except Exception as recreate_error:
-                        error_message = f"Erro ao recriar source de imagem: {str(recreate_error)}"
+                        logger.info("✅ Novo source de imagem criado com sucesso")
+                    except Exception as source_error:
+                        error_message = f"Erro ao criar source de imagem: {str(source_error)}"
                         logger.error(f"❌ {error_message}")
                         self.set_error(error_message)
                         raise Exception(error_message)
-            else:
-                # Tentar criar novo source se não existir
-                try:
-                    self.image_source = ImageSource(self.source_config)
-                    logger.info("✅ Novo source de imagem criado com sucesso")
-                except Exception as source_error:
-                    error_message = f"Erro ao criar source de imagem: {str(source_error)}"
-                    logger.error(f"❌ {error_message}")
-                    self.set_error(error_message)
-                    raise Exception(error_message)
-            
-            # Sempre salvar após atualização
-            self.save_config()
-            logger.info("Configuração de source atualizada e salva")
-            
-            # Limpar erro se a configuração foi bem-sucedida
-            if self.error_msg:
-                self.clear_error()
                 
+                # Sempre salvar após atualização
+                self.save_config()
+                logger.info("Configuração de source atualizada e salva")
+                
+                # Limpar erro se a configuração foi bem-sucedida
+                if self.error_msg:
+                    self.clear_error()
         except Exception as e:
             error_message = f"Erro ao configurar source: {str(e)}"
             logger.error(error_message)
             self.set_error(error_message)
             raise  # Re-raise para que a API retorne o erro
+        finally:
+            self.source_reconfiguring = False
 
     def update_trigger_config(self, new_config: Dict[str, Any]):
         """Atualiza configuração de trigger e salva"""
