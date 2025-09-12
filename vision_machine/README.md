@@ -122,7 +122,90 @@ Observações:
 - `GET/PUT /api/source_config` - Configuração da fonte
 - `GET/PUT /api/trigger_config` - Configuração do trigger
 - `GET/PUT /api/inspection_config` - Configuração das ferramentas
+- `GET/PUT /api/logging_config` - Configuração de logging de resultados
 - `GET /api/error` - Informações de erro
+
+## 🧾 Logging de Resultados (VM 11)
+
+### Visão Geral
+- Logging local em disco com escrita assíncrona em lote.
+- Cada resultado é gravado em um único arquivo `.alog` contendo cabeçalho + JSON + JPEG.
+- Retenção configurável: `keep_last` (remove antigos) ou `keep_first` (rejeita novos quando cheio).
+
+### Configuração (vm_config.json)
+Chave `logging` (também editável via `PUT /api/logging_config`):
+```json
+{
+  "logging": {
+    "enabled": true,
+    "mode": "keep_last",          
+    "max_logs": 1000,
+    "policy": "ALL",              
+    "batch_size": 20,               
+    "batch_ms": 500                 
+  }
+}
+```
+- `enabled`: ativa/desativa logging
+- `mode`: `keep_last`|`keep_first`
+- `max_logs`: limite máximo de arquivos `.alog` (0 desativa persistência)
+- `policy`: `ALL`|`APPROVED`|`REJECTED`
+- `batch_size`/`batch_ms`: critérios de flush do buffer de RAM
+
+### Endpoints
+- `GET /api/logging_config` → retorna config e `buffer_size`
+- `PUT /api/logging_config` → atualiza config
+- `GET /api/status` inclui:
+  - `logging_config`
+  - `logging_buffer_size`
+  - `logs_count` (quantidade de `.alog` no diretório)
+
+### Operação
+- A VM mantém um buffer de resultados em RAM; um worker assíncrono grava em lote.
+- Imagem gravada em JPEG (qualidade 80); JSON sem o array da imagem.
+- Diretório padrão dos logs: `./logs` (ao lado de `vm_config.json`).
+
+### Formato do arquivo .alog
+Estrutura binária:
+- Magic: `ALOG` (4 bytes)
+- Versão: `uint32` (big endian)
+- JSON length: `uint64` (big endian)
+- JPEG length: `uint64` (big endian)
+- JSON bytes (UTF-8)
+- JPEG bytes (opcional)
+
+Leitura simples em Python:
+```python
+import struct, json
+
+with open('logs/2025-09-12_12-00-00_<uuid>.alog','rb') as f:
+    magic = f.read(4)
+    assert magic == b'ALOG'
+    version = struct.unpack('>I', f.read(4))[0]
+    jlen = struct.unpack('>Q', f.read(8))[0]
+    ilen = struct.unpack('>Q', f.read(8))[0]
+    jbytes = f.read(jlen)
+    ib = f.read(ilen) if ilen else b''
+    data = json.loads(jbytes.decode('utf-8'))
+```
+
+### Teste Rápido
+1. Habilite logging:
+```bash
+curl -X PUT http://localhost:5000/api/logging_config \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"policy":"ALL","batch_size":2,"batch_ms":200}'
+```
+2. Configure trigger contínuo e inicie a inspeção:
+```bash
+curl -X PUT http://localhost:5000/api/trigger_config -H 'Content-Type: application/json' -d '{"type":"continuous","interval_ms":300}'
+curl -X POST http://localhost:5000/api/control -H 'Content-Type: application/json' -d '{"command":"start_inspection","params":{}}'
+```
+3. Aguarde alguns segundos e valide o status:
+```bash
+curl http://localhost:5000/api/status | jq '.logs_count, .logging_buffer_size'
+```
+4. Arquivos `.alog` estarão em `vision_machine/logs`.
 
 ## 🧪 **Testes**
 
@@ -130,6 +213,7 @@ Observações:
 ```bash
 python test_vm.py
 ```
+O script inclui um teste de logging básico que habilita o recurso, processa frames e verifica a criação de `.alog`, restaurando as configurações anteriores ao final.
 
 ### **Teste Manual Interativo**
 ```bash

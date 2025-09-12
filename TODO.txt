@@ -8,8 +8,8 @@ Frontend
 - (FE 3) [x] Tratar erros e estados vazios na tela de máquina
 - (FE 4) [ ] Componentizar seções de MachineDetailView.vue (arquivo está grande)
 - (FE 5) [–] Adicionar polling para atualizar status periodicamente (cancelado: WebSocket via Socket.IO já implementado)
-- (FE 6) [>] Edição de inspeção em modo ao vivo (modificações são refletidas imediatamente no fluxo da VM)
-- (FE 7) [ ] Gestão dos resultados das inspeções salvas (usabilidade)
+- (FE 6) [x] Edição de inspeção em modo ao vivo (modificações são refletidas imediatamente no fluxo da VM)
+- (FE 7) [>] Gestão dos resultados das inspeções salvas (usabilidade)
 - (FE 8) [ ] Melhorar sistema de usuário (manter usuário logado sob sessão)
 - (FE 9) [ ] Melhorar sistema de usuário: definir tipos de usuários e limitar funções que cada usuário pode executar (baixa prioridade)
 
@@ -68,8 +68,22 @@ VM (Vision Machine - Servidor Flask)
     se pequenas, são ignoradas.
 - (VM 10) [ ] Estudar a viabilidade técnica, sob a ótica de performance, de aplicar JWT entre VM e Orquestrador 
     (considerando o stream do WebSocket)
-- (VM 11) [ ] Projetar a estrutura da feature de log de resultados (quem será o responsável por gerar) 
+- (VM 11) [>] Projetar/implementar logging de resultados (VM responsável por gerar),
     com foco em performance
+  - (VM 11.1) [x] Adicionar seção logging em config (vm_config.json):
+    - enabled (bool), mode ("keep_last"|"keep_first"),
+    - max_logs (int), policy ("ALL"|"APPROVED"|"REJECTED"),
+    - batch_size (int), batch_ms (int)
+  - (VM 11.2) [x] Formato de arquivo único por log (imagem binária + JSON):
+    - header com tamanhos; bloco JPEG; bloco JSON (fixo)
+  - (VM 11.3) [x] Buffer em memória + escrita assíncrona em thread:
+    - deque limitado; flush por quantidade/tempo; métrica current_buffer_size
+  - (VM 11.4) [ ] Sincronização com orquestrador:
+    - endpoint para iniciar transferência; após OK do orquestrador, apagar transmitidos
+  - (VM 11.5) [x] Política de retenção respeitando max_logs e mode:
+    - keep_last remove antigos; keep_first rejeita novos quando cheio
+  - (VM 11.6) [ ] Amostragem e imagem:
+    - result_sampling (1/N), result_image ("thumb"|"full"); thumbnail opcional no JSON
 - (VM 12) [ ] Adicionar comunicação ModbusTCP para integrar a VM a dispositivos industriais (baixa prioridade)
 - (VM 13) [ ] Adicionar comunicação Ethernet/IP (dispositivos Rockwell) - (baixa prioridade)
 - (VM 14) [ ] Implementar Tool EDGE: dada uma linha, identificar ao longo dela todas as bordas existentes e retornar a quantidade de bordas,
@@ -106,6 +120,19 @@ Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
       - (    ) [X] adicionar edição de shapes do ROI de ferramentas     
         - (QA 3) [ ] QA/Docs: testes de integração FE↔BE↔VM; documentar fluxo e payloads
 
+- (VM 11) [ ] Log de resultados (performance e responsabilidade)
+  - (BE 10) [>] Orquestrador (Django): ingestão, retenção e indexação
+    - (BE 10.1) [ ] Modelos e migrações: InspectionResult, ToolResult
+      - Índices: vm_id, inspection_id, timestamp, decision
+      - Campos: image_url (string), thumb_base64 (opcional), width, height, tools_json (JSONB)
+    - (BE 10.2) [ ] API de ingestão: POST /api/results (autenticação por token da VM)
+      - Validação de schema; aceitar imagem por URL (servida pela VM) ou upload opcional
+    - (BE 10.3) [ ] APIs de leitura: GET /api/results (paginado/filtrado) e GET /api/results/{id}
+    - (BE 10.4) [ ] Rotação/retensão: TTL/tamanho; tarefa agendada de limpeza
+    - (BE 10.5) [ ] Exportação: endpoints CSV/JSON
+  - (VM 11) [ ] VM: envio assíncrono, backoff e correlação (trace-id)
+    - (QA 9) [ ] QA/Docs: testes de throughput; manual de operação e retenção
+
 - (FE 7) [ ] Gestão dos resultados das inspeções salvas (usabilidade)
   - (VM 1) [ ] VM: garantir payload consistente (mime, resolução, campos result/tools)
     - (BE 5) [ ] Orquestrador (Django): listagem/paginação/filtros; metadados (tempo, ferramenta, decisão)
@@ -133,10 +160,7 @@ Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
     - (VM 10) [ ] VM: validação dos tokens nos endpoints/status/control; clock skew
       - (QA 8) [ ] QA/Docs: testes de carga; documentação de segurança e operação
 
-- (VM 11) [ ] Log de resultados (performance e responsabilidade)
-  - (BE 10) [ ] Orquestrador (Django): endpoint/broker; retenção e indexação
-    - (VM 11) [ ] VM: envio assíncrono, backoff e correlação (trace-id)
-      - (QA 9) [ ] QA/Docs: testes de throughput; manual de operação e retenção
+
 
 - (VM 12) [ ] Integração industrial: ModbusTCP
   - (BE 11) [ ] Orquestrador (Django): UI/API para configurar mapeamentos; validações

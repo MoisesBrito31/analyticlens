@@ -87,6 +87,95 @@ def test_api_endpoints():
     
     return True
 
+def test_logging_basic():
+    """Testa pipeline básico de logging: habilita, processa e verifica .alog."""
+    print("\n🧪 TESTANDO LOGGING BÁSICO...")
+    try:
+        # Salvar config anterior
+        status_before = requests.get(f"{VM_URL}/api/status").json()
+        prev_logging = status_before.get('logging_config', {})
+        prev_trigger = status_before.get('trigger_config', {})
+
+        # Habilitar logging com batch pequeno
+        print("1️⃣ Habilitando logging...")
+        res = requests.put(f"{VM_URL}/api/logging_config", json={
+            "enabled": True,
+            "policy": "ALL",
+            "batch_size": 2,
+            "batch_ms": 200,
+            "mode": "keep_last",
+            "max_logs": 50
+        })
+        if res.status_code != 200:
+            print(f"❌ Falha ao habilitar logging: {res.status_code}")
+            return False
+
+        # Garantir trigger contínuo rápido
+        print("2️⃣ Configurando trigger contínuo para gerar frames...")
+        res = requests.put(f"{VM_URL}/api/trigger_config", json={"type": "continuous", "interval_ms": 300})
+        if res.status_code != 200:
+            print(f"❌ Falha ao configurar trigger: {res.status_code}")
+            return False
+
+        # Iniciar inspeção
+        print("3️⃣ Iniciando inspeção...")
+        res = requests.post(f"{VM_URL}/api/control", json={"command": "start_inspection", "params": {}})
+        if res.status_code != 200:
+            print(f"❌ Falha ao iniciar inspeção: {res.status_code}")
+            return False
+
+        # Aguardar processamento e flush do batch (poll com timeout)
+        deadline = time.time() + 6.0
+        logs_count = 0
+        buffer_size = 0
+        while time.time() < deadline:
+            st = requests.get(f"{VM_URL}/api/status").json()
+            logs_count = int(st.get('logs_count', 0))
+            buffer_size = int(st.get('logging_buffer_size', 0))
+            if logs_count > 0:
+                break
+            time.sleep(0.3)
+
+        print(f"📦 logs_count={logs_count}, buffer_size={buffer_size}")
+        if logs_count < 1:
+            # Fallback: checar diretórios comuns (vision_machine/logs e ./logs)
+            try:
+                vm_logs = os.path.join(os.path.dirname(__file__), 'logs')
+                root_logs = os.path.join(os.getcwd(), 'logs')
+                cnt = 0
+                for path in [vm_logs, root_logs]:
+                    if os.path.exists(path):
+                        cnt += len([f for f in os.listdir(path) if f.endswith('.alog')])
+                if cnt < 1:
+                    print("❌ Nenhum .alog encontrado após processamento (filesystem)")
+                    return False
+                else:
+                    print(f"✅ Logs encontrados no filesystem: {cnt}")
+            except Exception as fs_err:
+                print(f"❌ Erro ao verificar filesystem: {fs_err}")
+                return False
+
+        print("✅ Logging básico funcionando")
+
+        # Parar inspeção
+        requests.post(f"{VM_URL}/api/control", json={"command": "stop_inspection", "params": {}})
+
+        # Restaurar configurações anteriores
+        print("4️⃣ Restaurando configurações anteriores...")
+        try:
+            requests.put(f"{VM_URL}/api/logging_config", json=prev_logging)
+        except Exception:
+            pass
+        try:
+            requests.put(f"{VM_URL}/api/trigger_config", json=prev_trigger)
+        except Exception:
+            pass
+
+        return True
+    except Exception as e:
+        print(f"❌ Erro no teste de logging: {str(e)}")
+        return False
+
 def test_source_configuration():
     """Testa configuração de diferentes tipos de source"""
     print("\n🧪 TESTANDO CONFIGURAÇÃO DE SOURCE...")
@@ -896,6 +985,7 @@ def main():
         ("Configuração de Source", test_source_configuration),
         ("Controle de Modo", test_mode_control),
         ("Controle de Inspeção", test_inspection_control),
+        ("Logging Básico", test_logging_basic),
         ("WebSocket Básico", test_websocket_basic),
         ("WebSocket com Processamento", test_websocket_with_processing),
         ("Sistema de Tratamento de Erros", test_error_handling),

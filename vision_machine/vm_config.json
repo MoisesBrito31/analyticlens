@@ -1,7 +1,7 @@
 {
   "machine_id": "vm_001",
   "django_url": "http://localhost:8000",
-  "status": "running",
+  "status": "idle",
   "mode": "TESTE",
   "connection_status": "disconnected",
   "inspection_config": {
@@ -179,20 +179,28 @@
   },
   "source_config": {
     "type": "pasta",
-    "camera_id": 0,
+    "camera_id": 999,
     "resolution": [
       752,
       480
     ],
     "fps": 30,
-    "folder_path": "./testBlob_images",
+    "folder_path": "./test_images",
     "rtsp_url": ""
   },
   "trigger_config": {
     "type": "continuous",
-    "interval_ms": 100
+    "interval_ms": 1000
+  },
+  "logging": {
+    "enabled": true,
+    "mode": "keep_last",
+    "max_logs": 50,
+    "policy": "ALL",
+    "batch_size": 2,
+    "batch_ms": 200
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-06T04:38:55.372778"
+  "last_saved": "2025-09-12T21:34:40.254774"
 }

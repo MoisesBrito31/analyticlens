@@ -17,6 +17,8 @@ import atexit
 import glob
 import threading
 from datetime import datetime
+import uuid
+from collections import deque
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import base64
@@ -454,6 +456,11 @@ class TestModeProcessor:
                     
                     # Processar frame (simulação de inspeção)
                     result = self._process_frame(frame)
+                    # Enfileirar log conforme política
+                    try:
+                        self.vm.try_enqueue_log(frame, result)
+                    except Exception:
+                        pass
                     
                     # Atualizar contadores
                     self.frame_count += 1
@@ -671,6 +678,18 @@ class VisionMachine:
         # Controle de reconfiguração do source (evitar corrida com o loop)
         self.source_reconfiguring = False
         self.source_lock = threading.Lock()
+
+        # Logging de resultados: buffer e worker
+        self.log_buffer = deque()
+        self.log_buffer_lock = threading.Lock()
+        self.log_flush_event = threading.Event()
+        self.log_worker_running = True
+        # Diretório de logs
+        self.logs_dir = os.path.join(os.path.dirname(self.config_file) or '.', 'logs')
+        try:
+            os.makedirs(self.logs_dir, exist_ok=True)
+        except Exception:
+            pass
         
         # Inicializar source de imagem com tratamento de erro
         try:
@@ -702,6 +721,9 @@ class VisionMachine:
         # Verificar se deve iniciar inspeção automaticamente
         self._check_auto_start_inspection()
 
+        # Iniciar worker de logs (sempre disponível; respeita enabled no enqueue/flush)
+        self._start_log_worker()
+
     def _load_config(self):
         """Carrega configurações do arquivo JSON"""
         try:
@@ -727,6 +749,15 @@ class VisionMachine:
                 self.trigger_config = config.get('trigger_config', {
                     "type": "continuous",
                     "interval_ms": 500  # 500ms para processamento mais rápido
+                })
+                # Configuração de logging de resultados
+                self.logging_config = config.get('logging', {
+                    "enabled": False,
+                    "mode": "keep_last",
+                    "max_logs": 1000,
+                    "policy": "ALL",
+                    "batch_size": 20,
+                    "batch_ms": 500
                 })
                 # Intervalo de atualização do WebSocket no modo RUN (segundos)
                 self.websocket_update_RUN_mode = config.get('websocket_update_RUN_mode', 1.0)
@@ -770,6 +801,16 @@ class VisionMachine:
         # Padrão: no RUN limitar WebSocket a 1s
         self.websocket_update_RUN_mode = 1.0
 
+        # Configuração padrão de logging de resultados
+        self.logging_config = {
+            "enabled": False,
+            "mode": "keep_last",
+            "max_logs": 1000,
+            "policy": "ALL",
+            "batch_size": 20,
+            "batch_ms": 500
+        }
+
     def save_config(self):
         """Salva configurações atuais no arquivo JSON"""
         try:
@@ -782,6 +823,14 @@ class VisionMachine:
                 'inspection_config': self.inspection_config,
                 'source_config': self.source_config,
                 'trigger_config': self.trigger_config,
+                'logging': getattr(self, 'logging_config', {
+                    "enabled": False,
+                    "mode": "keep_last",
+                    "max_logs": 1000,
+                    "policy": "ALL",
+                    "batch_size": 20,
+                    "batch_ms": 500
+                }),
                 'error_msg': self.error_msg,  # Salvar mensagem de erro
                 'websocket_update_RUN_mode': getattr(self, 'websocket_update_RUN_mode', 1.0),
                 'last_saved': datetime.utcnow().isoformat()
@@ -799,6 +848,191 @@ class VisionMachine:
             
         except Exception as e:
             logger.error(f"Erro ao salvar configurações em {self.config_file}: {str(e)}")
+
+    # ==========================
+    # Logging de resultados
+    # ==========================
+    def _start_log_worker(self):
+        def _worker_loop():
+            while self.log_worker_running:
+                try:
+                    # Aguardar sinal ou timeout
+                    batch_timeout_s = max(0.0, float(self.logging_config.get('batch_ms', 500)) / 1000.0)
+                    self.log_flush_event.wait(timeout=batch_timeout_s)
+                    self.log_flush_event.clear()
+
+                    if not self.logging_config.get('enabled', False):
+                        continue
+
+                    # Montar lote
+                    items = []
+                    with self.log_buffer_lock:
+                        batch_size = int(self.logging_config.get('batch_size', 20))
+                        while self.log_buffer and len(items) < batch_size:
+                            items.append(self.log_buffer.popleft())
+                    # Gravar
+                    for item in items:
+                        try:
+                            self._write_log_file(item)
+                        except Exception as write_err:
+                            logger.warning(f"Falha ao gravar log: {str(write_err)}")
+                except Exception as loop_err:
+                    logger.warning(f"Erro no worker de logs: {str(loop_err)}")
+
+        self.log_worker_thread = threading.Thread(target=_worker_loop, name='LogWorker', daemon=True)
+        self.log_worker_thread.start()
+
+    def _stop_log_worker(self):
+        try:
+            self.log_worker_running = False
+            self.log_flush_event.set()
+            if hasattr(self, 'log_worker_thread') and self.log_worker_thread:
+                self.log_worker_thread.join(timeout=2.0)
+        except Exception:
+            pass
+
+    def _should_log(self, approved: bool) -> bool:
+        policy = str(self.logging_config.get('policy', 'ALL')).upper()
+        if policy == 'ALL':
+            return True
+        if policy == 'APPROVED':
+            return bool(approved)
+        if policy == 'REJECTED':
+            return not bool(approved)
+        return False
+
+    def try_enqueue_log(self, frame: Optional[np.ndarray], result: Dict[str, Any]):
+        try:
+            if not self.logging_config.get('enabled', False):
+                return
+
+            # Extrair aprovação e timestamp
+            if 'inspection_result' in result:
+                approved = bool(result.get('approved', True))
+                timestamp = result['inspection_result'].get('timestamp') or datetime.utcnow().isoformat()
+                final_image = result['inspection_result'].get('final_image') if isinstance(result['inspection_result'], dict) else None
+            else:
+                approved = bool(result.get('approved', True))
+                timestamp = result.get('timestamp') or datetime.utcnow().isoformat()
+                final_image = None
+
+            if not self._should_log(approved):
+                return
+
+            # Selecionar imagem para salvar (usar final_image quando disponível, senão frame)
+            image_to_save = final_image if isinstance(final_image, np.ndarray) else frame
+            jpeg_bytes = b''
+            width = 0
+            height = 0
+            if isinstance(image_to_save, np.ndarray):
+                try:
+                    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+                    ok, jpeg_buf = cv2.imencode('.jpg', image_to_save, encode_param)
+                    if ok:
+                        jpeg_bytes = jpeg_buf.tobytes()
+                        height, width = int(image_to_save.shape[0]), int(image_to_save.shape[1])
+                except Exception:
+                    pass
+
+            # Montar JSON do resultado (sem a imagem numpy)
+            safe_result = {}
+            try:
+                if 'inspection_result' in result:
+                    # Copiar sem campos pesados se existirem
+                    safe_result = dict(result['inspection_result'])
+                    if 'final_image' in safe_result:
+                        safe_result.pop('final_image', None)
+                else:
+                    safe_result = dict(result)
+            except Exception:
+                safe_result = {'error': 'failed_to_copy_result'}
+
+            record = {
+                'id': str(uuid.uuid4()),
+                'timestamp': timestamp,
+                'approved': approved,
+                'width': width,
+                'height': height,
+                'result_json': safe_result,
+                'image_jpeg': jpeg_bytes
+            }
+
+            with self.log_buffer_lock:
+                self.log_buffer.append(record)
+                # Sinalizar flush se tamanho do buffer atingir limiar
+                if len(self.log_buffer) >= int(self.logging_config.get('batch_size', 20)):
+                    self.log_flush_event.set()
+        except Exception as e:
+            logger.debug(f"Falha ao enfileirar log: {str(e)}")
+
+    def current_log_buffer_size(self) -> int:
+        with self.log_buffer_lock:
+            return len(self.log_buffer)
+
+    def _write_log_file(self, record: Dict[str, Any]):
+        # Antes de escrever: política keep_first pode rejeitar quando cheio
+        try:
+            mode = str(self.logging_config.get('mode', 'keep_last')).lower()
+            max_logs = int(self.logging_config.get('max_logs', 1000))
+        except Exception:
+            mode = 'keep_last'
+            max_logs = 1000
+
+        if max_logs == 0:
+            return  # retenção desabilitada
+
+        if mode == 'keep_first' and max_logs > 0:
+            try:
+                existing = [f for f in os.listdir(self.logs_dir) if f.endswith('.alog')]
+                if len(existing) >= max_logs:
+                    # rejeitar novos quando cheio
+                    return
+            except Exception:
+                pass
+
+        # Formato: magic 'ALOG' (4 bytes) + version (uint32) + json_len (uint64) + img_len (uint64) + json + img
+        magic = b'ALOG'
+        version = 1
+        json_bytes = json.dumps({
+            'id': record.get('id'),
+            'timestamp': record.get('timestamp'),
+            'approved': record.get('approved'),
+            'width': record.get('width'),
+            'height': record.get('height'),
+            'result': record.get('result_json')
+        }, ensure_ascii=False).encode('utf-8')
+        img_bytes = record.get('image_jpeg') or b''
+
+        filename = f"{record.get('timestamp').replace(':','-').replace('T','_').split('.')[0]}_{record.get('id')}.alog"
+        file_path = os.path.join(self.logs_dir, filename)
+
+        with open(file_path, 'wb') as f:
+            f.write(magic)
+            f.write(int(version).to_bytes(4, 'big'))
+            f.write(int(len(json_bytes)).to_bytes(8, 'big'))
+            f.write(int(len(img_bytes)).to_bytes(8, 'big'))
+            f.write(json_bytes)
+            if img_bytes:
+                f.write(img_bytes)
+
+        # Após escrever: política keep_last remove mais antigos além do limite
+        if mode == 'keep_last' and max_logs > 0:
+            try:
+                files = [
+                    (os.path.join(self.logs_dir, f), os.path.getmtime(os.path.join(self.logs_dir, f)))
+                    for f in os.listdir(self.logs_dir) if f.endswith('.alog')
+                ]
+                if len(files) > max_logs:
+                    # Ordenar por mtime ascendente (mais antigos primeiro)
+                    files.sort(key=lambda x: x[1])
+                    to_delete = files[:max(0, len(files) - max_logs)]
+                    for path, _ in to_delete:
+                        try:
+                            os.remove(path)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
     def update_source_config(self, new_config: Dict[str, Any]):
         """Atualiza configuração de source e salva (com sincronização para evitar corrida)."""
@@ -902,6 +1136,36 @@ class VisionMachine:
         # Sempre salvar após atualização
         self.save_config()
         logger.info("Configuração de inspeção atualizada e salva")
+
+    def _validate_logging_config(self, config: Dict[str, Any]):
+        """Valida configuração de logging de resultados"""
+        mode = config.get('mode', self.logging_config.get('mode', 'keep_last'))
+        if mode not in ['keep_last', 'keep_first']:
+            raise ValueError(f"Modo de logging inválido: {mode}")
+        policy = config.get('policy', self.logging_config.get('policy', 'ALL'))
+        if policy not in ['ALL', 'APPROVED', 'REJECTED']:
+            raise ValueError(f"Policy de logging inválida: {policy}")
+        max_logs = int(config.get('max_logs', self.logging_config.get('max_logs', 1000)))
+        if max_logs < 0:
+            raise ValueError("max_logs deve ser >= 0")
+        batch_size = int(config.get('batch_size', self.logging_config.get('batch_size', 20)))
+        if batch_size <= 0:
+            raise ValueError("batch_size deve ser > 0")
+        batch_ms = int(config.get('batch_ms', self.logging_config.get('batch_ms', 500)))
+        if batch_ms < 0:
+            raise ValueError("batch_ms deve ser >= 0")
+
+    def update_logging_config(self, new_config: Dict[str, Any]):
+        """Atualiza configuração de logging e salva"""
+        try:
+            self._validate_logging_config(new_config)
+            self.logging_config.update(new_config)
+            self.save_config()
+            logger.info("Configuração de logging atualizada e salva")
+        except Exception as e:
+            error_message = f"Erro ao atualizar configuração de logging: {str(e)}"
+            logger.error(error_message)
+            raise Exception(error_message)
 
     def update_tool_config(self, tool_config: Dict[str, Any]):
         """Atualiza configuração de uma tool específica ou adiciona nova tool"""
@@ -1240,6 +1504,9 @@ class FlaskVisionServer:
                 "timestamp": datetime.utcnow().isoformat(),
                 "source_config": self.vm.source_config,
                 "trigger_config": self.vm.trigger_config,
+                "logging_config": getattr(self.vm, 'logging_config', {}),
+                "logging_buffer_size": getattr(self.vm, 'current_log_buffer_size', lambda: 0)(),
+                "logs_count": getattr(self.vm, 'current_logs_count', lambda: 0)(),
                 "trigger_info": trigger_info,
                 "source_available": self.vm.image_source is not None
             })
@@ -1423,6 +1690,23 @@ class FlaskVisionServer:
                     data = request.get_json()
                     self.vm.update_inspection_config(data)
                     logger.info("Configuração de inspeção atualizada")
+                    return jsonify({"success": True})
+                except Exception as e:
+                    return jsonify({"success": False, "error": str(e)}), 500
+
+        @self.app.route('/api/logging_config', methods=['GET', 'PUT'])
+        def logging_config():
+            """Gerencia configuração local de logging de resultados"""
+            if request.method == 'GET':
+                return jsonify({
+                    **getattr(self.vm, 'logging_config', {}),
+                    'buffer_size': getattr(self.vm, 'current_log_buffer_size', lambda: 0)()
+                })
+            else:
+                try:
+                    data = request.get_json()
+                    self.vm.update_logging_config(data)
+                    logger.info("Configuração de logging atualizada")
                     return jsonify({"success": True})
                 except Exception as e:
                     return jsonify({"success": False, "error": str(e)}), 500
