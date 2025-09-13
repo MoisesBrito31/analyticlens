@@ -83,6 +83,16 @@ class VirtualMachine(models.Model):
     # Relacionamentos básicos
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="Proprietário")
     is_active = models.BooleanField(default=True, verbose_name="Ativa")
+
+    # Logging (espelhado do status da VM)
+    logging_enabled = models.BooleanField(default=False, verbose_name="Logging Ativo")
+    logging_mode = models.CharField(max_length=20, default='keep_last', verbose_name="Modo de Logging")
+    logging_max_logs = models.IntegerField(default=1000, verbose_name="Máx. Logs")
+    logging_policy = models.CharField(max_length=20, default='ALL', verbose_name="Política de Logging")
+    logging_batch_size = models.IntegerField(default=20, verbose_name="Batch Size")
+    logging_batch_ms = models.IntegerField(default=500, verbose_name="Batch (ms)")
+    logs_count = models.IntegerField(default=0, verbose_name="Qtd. Logs em Disco")
+    logging_buffer_size = models.IntegerField(default=0, verbose_name="Buffer de Logging (RAM)")
     
     class Meta:
         verbose_name = "Máquina Virtual"
@@ -122,6 +132,51 @@ class Inspection(models.Model):
         verbose_name_plural = 'Inspeções'
         ordering = ['vm_id', 'id']
 
+
+class InspectionResult(models.Model):
+    """Resultado de uma execução de inspeção na VM.
+    Armazena o JSON completo do resultado (sem a imagem binária) e referencia a imagem por URL.
+    """
+
+    vm = models.ForeignKey(
+        VirtualMachine,
+        on_delete=models.CASCADE,
+        related_name='inspection_results',
+        verbose_name='Máquina'
+    )
+    # Identificação e tempo
+    cycle_id = models.CharField(max_length=64, blank=True, null=True, db_index=True, verbose_name='ID do Ciclo')
+    timestamp = models.DateTimeField(db_index=True, verbose_name='Timestamp')
+
+    # Decisão e performance
+    approved = models.BooleanField(default=False, db_index=True, verbose_name='Aprovado')
+    duration_ms = models.IntegerField(default=0, verbose_name='Duração (ms)')
+    frame = models.IntegerField(default=0, verbose_name='Número do Frame')
+    reprovadas = models.IntegerField(default=0, verbose_name='Total Reprovadas até o Frame')
+
+    # Imagem resultante (referenciada por URL)
+    image_url = models.CharField(max_length=1000, blank=True, null=True, verbose_name='URL da Imagem')
+    image_mime = models.CharField(max_length=50, blank=True, null=True, verbose_name='MIME da Imagem')
+    image_width = models.IntegerField(blank=True, null=True, verbose_name='Largura da Imagem')
+    image_height = models.IntegerField(blank=True, null=True, verbose_name='Altura da Imagem')
+
+    # JSON completo do resultado (incluindo métricas e dados de tools)
+    result_json = models.JSONField(default=dict, verbose_name='Resultado (JSON)')
+
+    # Metadados
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Resultado de Inspeção'
+        verbose_name_plural = 'Resultados de Inspeção'
+        ordering = ['-timestamp', '-id']
+        indexes = [
+            models.Index(fields=['vm', 'timestamp']),
+            models.Index(fields=['vm', 'approved', 'timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.vm.name} | {'OK' if self.approved else 'NOK'} @ {self.timestamp}"
 
 class ToolKind(models.Model):
     """Catálogo de tipos de ferramentas (extensível via dados)."""

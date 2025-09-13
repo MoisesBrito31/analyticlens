@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import VirtualMachine
+from .models import VirtualMachine, InspectionResult
 
 
 class VirtualMachineListSerializer(serializers.ModelSerializer):
@@ -42,7 +42,9 @@ class VirtualMachineSerializer(serializers.ModelSerializer):
             'source_type', 'camera_id', 'resolution_width', 'resolution_height',
             'fps', 'folder_path', 'rtsp_url', 'trigger_type', 'trigger_interval_ms',
             'inspection_config', 'last_heartbeat', 'error_message', 'created_at',
-            'updated_at', 'resolution'
+            'updated_at', 'resolution',
+            'logging_enabled', 'logging_mode', 'logging_max_logs', 'logging_policy',
+            'logging_batch_size', 'logging_batch_ms', 'logs_count', 'logging_buffer_size'
         ]
     
     def get_resolution(self, obj):
@@ -138,3 +140,14 @@ class SaveInspectionRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     overwrite = serializers.BooleanField(required=False, default=False)
     payload = serializers.DictField(required=False)
+
+
+class InspectionResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InspectionResult
+        fields = [
+            'id', 'vm', 'cycle_id', 'timestamp', 'frame', 'reprovadas',
+            'approved', 'duration_ms', 'image_url', 'image_mime',
+            'image_width', 'image_height', 'result_json', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']

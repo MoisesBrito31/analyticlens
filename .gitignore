@@ -18,6 +18,10 @@ db.sqlite3
 media/
 staticfiles/
 
+# Logs da Vision Machine
+vision_machine/logs/
+*.alog
+
 # Frontend (Node/Vite/Vue)
 frontend/node_modules/
 frontend/dist/

@@ -10,6 +10,7 @@ from .models import (
     MorphologyTool,
     BlobToolConfig,
     MathTool,
+    InspectionResult,
 )
 
 
@@ -19,7 +20,7 @@ class VirtualMachineAdmin(admin.ModelAdmin):
     
     list_display = [
         'machine_id', 'name', 'status', 'mode', 'connection_status',
-        'ip_address', 'port', 'source_type', 'created_at'
+        'ip_address', 'port', 'source_type', 'logs_count', 'logging_buffer_size', 'created_at'
     ]
     
     list_filter = [
@@ -53,6 +54,14 @@ class VirtualMachineAdmin(admin.ModelAdmin):
         }),
         ('Configuração', {
             'fields': ['inspection_config', 'error_message']
+        }),
+        ('Logging (espelhado da VM)', {
+            'fields': [
+                'logging_enabled', 'logging_mode', 'logging_policy',
+                'logging_max_logs', 'logging_batch_size', 'logging_batch_ms',
+                'logs_count', 'logging_buffer_size'
+            ],
+            'classes': ['collapse']
         }),
         ('Metadados', {
             'fields': ['owner', 'created_at', 'updated_at', 'last_heartbeat'],
@@ -142,3 +151,12 @@ class InspectionAdmin(admin.ModelAdmin):
     raw_id_fields = ['vm']
     inlines = [InspectionToolInline]
     ordering = ['vm', 'id']
+
+
+@admin.register(InspectionResult)
+class InspectionResultAdmin(admin.ModelAdmin):
+    list_display = ['vm', 'timestamp', 'frame', 'approved', 'reprovadas', 'duration_ms', 'image_url']
+    list_filter = ['approved', 'vm']
+    search_fields = ['vm__name', 'vm__machine_id', 'cycle_id']
+    readonly_fields = ['created_at']
+    ordering = ['-timestamp']

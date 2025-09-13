@@ -969,6 +969,14 @@ class VisionMachine:
         with self.log_buffer_lock:
             return len(self.log_buffer)
 
+    def current_logs_count(self) -> int:
+        try:
+            if not hasattr(self, 'logs_dir') or not self.logs_dir:
+                return 0
+            return len([f for f in os.listdir(self.logs_dir) if f.endswith('.alog')])
+        except Exception:
+            return 0
+
     def _write_log_file(self, record: Dict[str, Any]):
         # Antes de escrever: política keep_first pode rejeitar quando cheio
         try:

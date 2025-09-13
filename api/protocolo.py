@@ -90,7 +90,23 @@ class ProtocoloVM:
         vm.connection_status = vm_connection_status
         vm.last_heartbeat = timezone.now()
         vm.error_message = vm_error or ''
-        vm.save(update_fields=['status', 'mode', 'connection_status', 'last_heartbeat', 'error_message', 'updated_at'])
+        # Espelhar logging quando disponível
+        logging_cfg = status_payload.get('logging_config') or {}
+        vm.logging_enabled = bool(logging_cfg.get('enabled', False))
+        vm.logging_mode = logging_cfg.get('mode', vm.logging_mode)
+        vm.logging_max_logs = int(logging_cfg.get('max_logs', vm.logging_max_logs))
+        vm.logging_policy = logging_cfg.get('policy', vm.logging_policy)
+        vm.logging_batch_size = int(logging_cfg.get('batch_size', vm.logging_batch_size))
+        vm.logging_batch_ms = int(logging_cfg.get('batch_ms', vm.logging_batch_ms))
+        vm.logging_buffer_size = int(status_payload.get('logging_buffer_size', vm.logging_buffer_size))
+        vm.logs_count = int(status_payload.get('logs_count', vm.logs_count))
+
+        vm.save(update_fields=[
+            'status', 'mode', 'connection_status', 'last_heartbeat', 'error_message',
+            'logging_enabled', 'logging_mode', 'logging_max_logs', 'logging_policy',
+            'logging_batch_size', 'logging_batch_ms', 'logging_buffer_size', 'logs_count',
+            'updated_at'
+        ])
 
     def _handle_http_error(self, vm: VirtualMachine, exc: Exception, update_db_on_error: bool) -> Dict[str, Any]:
         # Se for timeout, marcar como OFFLINE apenas quando autorizado a atualizar DB neste fluxo
