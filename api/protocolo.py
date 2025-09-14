@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional
+import logging
 import requests
 from django.utils import timezone
 from urllib.parse import urlparse
@@ -12,10 +13,11 @@ class ProtocoloVM:
     Integra com o servidor Flask da VM exposto em vision_machine/vm.py
     """
 
-    def __init__(self, request_timeout_seconds: float = 2.0):
+    def __init__(self, request_timeout_seconds: float = 5.0):
         self.request_timeout_seconds = request_timeout_seconds
         # Controle interno: se deve atualizar DB em erro durante um comando
         self._update_db_on_error = True
+        self._logger = logging.getLogger(__name__)
 
     def _base_url(self, vm: VirtualMachine) -> str:
         """
@@ -146,6 +148,9 @@ class ProtocoloVM:
             'update_inspection_config': self._handle_update_inspection_config,
             'config_tool': self._handle_config_tool,
             'delete_tool': self._handle_delete_tool,
+            'update_logging_config': self._handle_update_logging_config,
+            'clear_logs': self._handle_clear_logs,
+            'sync_logs': self._handle_sync_logs,
         }
 
         if command not in handlers:
@@ -167,6 +172,8 @@ class ProtocoloVM:
     def update_status(self, vm: VirtualMachine, mark_offline_on_error: bool = True) -> Dict[str, Any]:
         try:
             url = f"{self._base_url(vm)}/api/status"
+            if self._logger:
+                self._logger.debug(f"ProtocoloVM: GET status -> {url}")
             res = requests.get(url, timeout=self.request_timeout_seconds)
             res.raise_for_status()
             data = res.json()
@@ -182,6 +189,11 @@ class ProtocoloVM:
 
     def _post_control(self, vm: VirtualMachine, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self._base_url(vm)}/api/control"
+        if self._logger:
+            try:
+                self._logger.debug(f"ProtocoloVM: POST control -> {url} | payload={payload}")
+            except Exception:
+                pass
         res = requests.post(url, json=payload, timeout=self.request_timeout_seconds)
         res.raise_for_status()
         return res.json()
@@ -275,6 +287,51 @@ class ProtocoloVM:
         except Exception as e:
             if self.allow_simulation_fallback:
                 return {'ok': True}
+            return self._handle_http_error(vm, e, True)
+
+    def _handle_update_logging_config(self, vm: VirtualMachine, params: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            # Aceitar apenas chaves conhecidas
+            allowed = {'enabled', 'mode', 'policy', 'max_logs', 'batch_size', 'batch_ms'}
+            payload = {k: v for k, v in (params or {}).items() if k in allowed}
+            url = f"{self._base_url(vm)}/api/logging_config"
+            res = requests.put(url, json=payload, timeout=self.request_timeout_seconds)
+            res.raise_for_status()
+            # Atualiza status/espelhamento no banco após alterar
+            self.update_status(vm, True)
+            return {'ok': True}
+        except Exception as e:
+            return self._handle_http_error(vm, e, True)
+
+    def _handle_clear_logs(self, vm: VirtualMachine, _: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            data = self._post_control(vm, {"command": "clear_logs", "params": {}})
+            # Atualizar status/espelho após limpeza
+            self.update_status(vm, True)
+            return {"ok": True, **({k: v for k, v in (data or {}).items() if k not in ('success',)})}
+        except Exception as e:
+            return self._handle_http_error(vm, e, True)
+
+    def _handle_sync_logs(self, vm: VirtualMachine, params: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            url = f"{self._base_url(vm)}/api/logs/sync"
+            if hasattr(self, '_logger') and self._logger:
+                self._logger.debug(f"ProtocoloVM: POST sync logs -> {url}")
+            # A sincronização pode levar mais tempo (upload de vários arquivos)
+            sync_timeout = max(self.request_timeout_seconds, 60.0)
+            body = {}
+            try:
+                if isinstance(params, dict) and params.get('django_url'):
+                    body['django_url'] = params.get('django_url')
+            except Exception:
+                pass
+            res = requests.post(url, json=body, timeout=sync_timeout)
+            res.raise_for_status()
+            data = res.json()
+            # Atualiza status após sincronização
+            self.update_status(vm, True)
+            return {'ok': True, **({k: v for k, v in (data or {}).items() if k not in ('success',)})}
+        except Exception as e:
             return self._handle_http_error(vm, e, True)
 
 

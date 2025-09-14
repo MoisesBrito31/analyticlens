@@ -7,6 +7,7 @@ import MachineDetailView from '@/views/MachineDetailView.vue'
 import InspectionsView from '@/views/InspectionsView.vue'
 import InspectionEditOfflineView from '@/views/InspectionEditOfflineView.vue'
 import InspectionEditOnlineView from '@/views/InspectionEditOnlineView.vue'
+import InspectionLogsView from '@/views/InspectionLogsView.vue'
 import ConfigurationsView from '@/views/ConfigurationsView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 
@@ -46,6 +47,12 @@ const router = createRouter({
       path: '/inspections',
       name: 'inspections',
       component: InspectionsView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/inspection-logs',
+      name: 'inspection-logs',
+      component: InspectionLogsView,
       meta: { requiresAuth: true }
     },
     {

@@ -28,6 +28,10 @@
           <Icon name="clipboard-check" size="1.25rem" />
           <span>Inspeções</span>
         </router-link>
+        <router-link to="/inspection-logs" class="nav-item" active-class="active">
+          <Icon name="journal-text" size="1.25rem" />
+          <span>Log de Inspeções</span>
+        </router-link>
         <router-link to="/configurations" class="nav-item" active-class="active">
           <Icon name="gear" size="1.25rem" />
           <span>Configurações</span>
@@ -96,6 +100,10 @@
         <router-link to="/inspections" class="mobile-nav-item" @click="closeMobileMenu">
           <Icon name="clipboard-check" size="1.25rem" />
           <span>Inspeções</span>
+        </router-link>
+        <router-link to="/inspection-logs" class="mobile-nav-item" @click="closeMobileMenu">
+          <Icon name="journal-text" size="1.25rem" />
+          <span>Log de Inspeções</span>
         </router-link>
         <router-link to="/configurations" class="mobile-nav-item" @click="closeMobileMenu">
           <Icon name="gear" size="1.25rem" />

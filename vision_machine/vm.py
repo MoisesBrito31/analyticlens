@@ -8,6 +8,7 @@ via REST API, WebSocket e Webhooks conforme o protocolo definido.
 """
 
 import os
+import requests
 import json
 import time
 import logging
@@ -942,10 +943,36 @@ class VisionMachine:
                     safe_result = dict(result['inspection_result'])
                     if 'final_image' in safe_result:
                         safe_result.pop('final_image', None)
+                    
+                    # Adicionar campos necessários para o AoVivoImg
+                    inspection_summary = safe_result.get('inspection_summary', {})
+                    tools_results = safe_result.get('tool_results', [])
+                    tools_config = self.inspection_config.get('tools', [])
+                    
+                    # Calcular aprovados e reprovados das ferramentas
+                    aprovados = sum(1 for tool in tools_results if tool.get('inspec_pass_fail', False))
+                    reprovados = len(tools_results) - aprovados
+                    
+                    # Usar dados da inspeção atual
+                    safe_result.update({
+                        'aprovados': aprovados,
+                        'reprovados': reprovados,
+                        'frame': inspection_summary.get('frame', 0),
+                        'time': f"{inspection_summary.get('total_processing_time_ms', 0):.2f}ms",
+                        'tools': tools_config,  # Configuração das ferramentas
+                        'result': tools_results  # Resultados das ferramentas
+                    })
+                    
+                    # Remover tool_results para evitar duplicação
+                    safe_result.pop('tool_results', None)
+                    
                 else:
                     safe_result = dict(result)
-            except Exception:
-                safe_result = {'error': 'failed_to_copy_result'}
+            except Exception as e:
+                logger.error(f"Erro ao montar JSON do log: {str(e)}")
+                logger.error(f"Result type: {type(result)}")
+                logger.error(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+                safe_result = {'error': 'failed_to_copy_result', 'details': str(e)}
 
             record = {
                 'id': str(uuid.uuid4()),
@@ -976,6 +1003,35 @@ class VisionMachine:
             return len([f for f in os.listdir(self.logs_dir) if f.endswith('.alog')])
         except Exception:
             return 0
+
+    def clear_logs_on_disk(self) -> Dict[str, Any]:
+        """Remove todos os arquivos de log (.alog) do diretório de logs e limpa o buffer."""
+        removed = 0
+        errors = 0
+        try:
+            if hasattr(self, 'logs_dir') and self.logs_dir and os.path.isdir(self.logs_dir):
+                for fname in list(os.listdir(self.logs_dir)):
+                    if not fname.endswith('.alog'):
+                        continue
+                    try:
+                        os.remove(os.path.join(self.logs_dir, fname))
+                        removed += 1
+                    except Exception:
+                        errors += 1
+            # Limpar buffer em memória para evitar flush de itens antigos
+            try:
+                with self.log_buffer_lock:
+                    self.log_buffer.clear()
+                self.log_flush_event.clear()
+            except Exception:
+                pass
+        except Exception:
+            errors += 1
+        return {
+            "removed": removed,
+            "errors": errors,
+            "remaining": self.current_logs_count()
+        }
 
     def _write_log_file(self, record: Dict[str, Any]):
         # Antes de escrever: política keep_first pode rejeitar quando cheio
@@ -1586,6 +1642,12 @@ class FlaskVisionServer:
                     logger.info("Inspeção parada")
                     return jsonify({"success": True})
                 
+                elif command == 'clear_logs':
+                    logger.info("🧹 Comando clear_logs recebido")
+                    result = self.vm.clear_logs_on_disk()
+                    logger.info(f"✅ Logs limpos. Removidos: {result.get('removed')} | Restantes: {result.get('remaining')}")
+                    return jsonify({"success": True, **result})
+                
                 elif command == 'trigger':
                     logger.info("🔘 Comando trigger recebido")
                     
@@ -1746,6 +1808,66 @@ class FlaskVisionServer:
                         return jsonify({"success": False, "error": "Nenhum erro para limpar"}), 404
                 except Exception as e:
                     return jsonify({"success": False, "error": str(e)}), 500
+
+        @self.app.route('/api/logs/sync', methods=['POST'])
+        def sync_logs_to_orchestrator():
+            """Envia arquivos .alog ao orquestrador (Django) e remove os enviados com sucesso."""
+            uploaded = 0
+            failed = 0
+            remaining_before = getattr(self.vm, 'current_logs_count', lambda: 0)()
+            try:
+                payload = None
+                try:
+                    payload = request.get_json(silent=True) or {}
+                except Exception:
+                    payload = {}
+                override_base = (payload or {}).get('django_url')
+                base_url = str(override_base or self.vm.django_url or '').rstrip('/')
+                if not base_url:
+                    return jsonify({"success": False, "error": "django_url não configurado na VM"}), 400
+                endpoint = f"{base_url}/api/logs/upload"
+                logs_dir = getattr(self.vm, 'logs_dir', None)
+                if not logs_dir or not os.path.isdir(logs_dir):
+                    return jsonify({"success": True, "uploaded": 0, "failed": 0, "remaining": 0})
+
+                for fname in list(os.listdir(logs_dir)):
+                    if not fname.endswith('.alog'):
+                        continue
+                    fpath = os.path.join(logs_dir, fname)
+                    try:
+                        with open(fpath, 'rb') as f:
+                            files = { 'file': (fname, f, 'application/octet-stream') }
+                            data = { 'machine_id': self.vm.machine_id }
+                            resp = requests.post(endpoint, files=files, data=data, timeout=10)
+                        if 200 <= resp.status_code < 300:
+                            try:
+                                os.remove(fpath)
+                            except Exception:
+                                pass
+                            uploaded += 1
+                        else:
+                            failed += 1
+                    except Exception:
+                        failed += 1
+
+                # Após sincronizar, limpar também buffer em memória para impedir flush de itens antigos
+                try:
+                    with self.vm.log_buffer_lock:
+                        self.vm.log_buffer.clear()
+                    self.vm.log_flush_event.clear()
+                except Exception:
+                    pass
+
+                remaining_after = getattr(self.vm, 'current_logs_count', lambda: 0)()
+                return jsonify({
+                    "success": True,
+                    "uploaded": uploaded,
+                    "failed": failed,
+                    "remaining": remaining_after,
+                    "before": remaining_before
+                })
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
 
     def _setup_socketio_events(self):
         """Configura eventos do SocketIO/WebSocket"""

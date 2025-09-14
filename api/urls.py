@@ -7,6 +7,11 @@ from .views import (
     VMDetail,
     VMAction,
     VMStatusSummary,
+    VMLoggingConfig,
+    VMClearLogs,
+    VMSyncLogs,
+    vm_logs_upload_function,
+    InspectionResultsList,
     SaveInspection,
     InspectionsList,
     InspectionDetail,
@@ -29,8 +34,16 @@ urlpatterns = [
     
     # Ações da VM - Start, stop, restart, trigger
     path('vms/<int:vm_id>/action', VMAction.as_view(), name='vm_action'),
-    
 
+    # Logging da VM via protocolo
+    path('vms/<int:vm_id>/logging_config', VMLoggingConfig.as_view(), name='vm_logging_config'),
+    path('vms/<int:vm_id>/clear_logs', VMClearLogs.as_view(), name='vm_clear_logs'),
+    path('vms/<int:vm_id>/sync_logs', VMSyncLogs.as_view(), name='vm_sync_logs'),
+    # Upload direto da VM (sem auth) - usado por /api/logs/sync
+    path('logs/upload', vm_logs_upload_function, name='vm_logs_upload'),
+    
+    # Resultados de inspeção
+    path('inspection-results', InspectionResultsList.as_view(), name='inspection_results_list'),
     
     # Resumo do status de todas as VMs
     path('vms/status/summary', VMStatusSummary.as_view(), name='vm_status_summary'),

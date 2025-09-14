@@ -1,5 +1,5 @@
 {
-  "machine_id": "vm_001",
+  "machine_id": "VM_001",
   "django_url": "http://localhost:8000",
   "status": "running",
   "mode": "TESTE",
@@ -83,12 +83,12 @@
   "logging": {
     "enabled": true,
     "mode": "keep_last",
-    "max_logs": 50,
+    "max_logs": 20,
     "policy": "ALL",
     "batch_size": 2,
     "batch_ms": 200
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-12T23:06:32.890288"
+  "last_saved": "2025-09-14T06:26:29.049139"
 }

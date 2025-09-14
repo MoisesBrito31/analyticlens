@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.db.models import Q
+from django.http import JsonResponse
 from django.utils import timezone
 from datetime import timedelta
 import json
@@ -12,12 +13,14 @@ import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework import status
 
 # Local imports
 from .models import (
     VirtualMachine, Inspection, InspectionTool, ToolKind,
-    GrayscaleTool, BlurTool, ThresholdTool, MorphologyTool, BlobToolConfig, MathTool
+    GrayscaleTool, BlurTool, ThresholdTool, MorphologyTool, BlobToolConfig, MathTool,
+    InspectionResult
 )
 from .serializers import (
     VirtualMachineListSerializer,
@@ -203,6 +206,330 @@ class VMDetail(APIView):
         return Response({
             'message': 'VM apagada com sucesso'
         }, status=status.HTTP_200_OK)
+
+
+class VMLoggingConfig(APIView):
+    """Atualiza a configuração de logging na VM via protocolo."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, vm_id):
+        try:
+            try:
+                vm = VirtualMachine.objects.get(id=vm_id, is_active=True)
+            except VirtualMachine.DoesNotExist:
+                return Response({'erro': 'VM não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+            body = request.data if isinstance(request.data, dict) else {}
+            allowed = {'enabled', 'mode', 'policy', 'max_logs', 'batch_size', 'batch_ms'}
+            params = {k: body.get(k) for k in allowed if k in body}
+            if not params:
+                return Response({'erro': 'Nenhum parâmetro de logging fornecido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            proto = ProtocoloVM()
+            result = proto.send_command(vm, 'update_logging_config', params=params)
+            if not result.get('ok', False):
+                return Response({'erro': result.get('error', 'Falha ao atualizar logging na VM')}, status=status.HTTP_502_BAD_GATEWAY)
+
+            # Retornar estado atualizado da VM
+            ProtocoloVM().update_status(vm, mark_offline_on_error=True)
+            serializer = VirtualMachineSerializer(vm)
+            return Response({'success': True, 'vm': serializer.data})
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VMClearLogs(APIView):
+    """Limpa os logs (.alog) do disco da VM via protocolo."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, vm_id):
+        try:
+            try:
+                vm = VirtualMachine.objects.get(id=vm_id, is_active=True)
+            except VirtualMachine.DoesNotExist:
+                return Response({'erro': 'VM não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+            proto = ProtocoloVM()
+            result = proto.send_command(vm, 'clear_logs', params={})
+            if not result.get('ok', False):
+                return Response({'erro': result.get('error', 'Falha ao limpar logs')}, status=status.HTTP_502_BAD_GATEWAY)
+
+            # Atualizar status da VM após limpeza
+            ProtocoloVM().update_status(vm, mark_offline_on_error=True)
+            serializer = VirtualMachineSerializer(vm)
+            payload = {'success': True, 'vm': serializer.data}
+            # anexar métricas de limpeza quando disponíveis
+            for k in ('removed', 'errors', 'remaining'):
+                if k in result:
+                    payload[k] = result[k]
+            return Response(payload)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VMSyncLogs(APIView):
+    """Solicita à VM que envie os .alog ao orquestrador e limpe os enviados."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, vm_id):
+        try:
+            try:
+                vm = VirtualMachine.objects.get(id=vm_id, is_active=True)
+            except VirtualMachine.DoesNotExist:
+                return Response({'erro': 'VM não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+            proto = ProtocoloVM()
+            # Passar django_url explicitamente para garantir base correta do orquestrador
+            params = {}
+            try:
+                if vm.django_url:
+                    params['django_url'] = vm.django_url
+            except Exception:
+                pass
+            result = proto.send_command(vm, 'sync_logs', params=params)
+            if not result.get('ok', False):
+                return Response({'erro': result.get('error', 'Falha ao sincronizar logs')}, status=status.HTTP_502_BAD_GATEWAY)
+
+            ProtocoloVM().update_status(vm, mark_offline_on_error=True)
+            serializer = VirtualMachineSerializer(vm)
+            payload = {'success': True, 'vm': serializer.data}
+            for k in ('uploaded', 'failed', 'remaining', 'before'):
+                if k in result:
+                    payload[k] = result[k]
+            return Response(payload)
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+def vm_logs_upload_function(request):
+    """Recebe arquivos .alog enviados pela VM e armazena no disco do orquestrador.
+    Esta rota é chamada diretamente pela VM; por isso, não exige autenticação.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'erro': 'Método não permitido'}, status=405)
+        
+    try:
+        machine_id = request.POST.get('machine_id') or request.GET.get('machine_id')
+        upload = request.FILES.get('file')
+        
+        print(f"[VMLogsUpload] Recebendo: machine_id='{machine_id}', arquivo='{upload.name if upload else None}'")
+        
+        if not machine_id or not upload:
+            return JsonResponse({'erro': 'machine_id e file são obrigatórios'}, status=400)
+
+        # Resolver VM
+        vm = VirtualMachine.objects.filter(machine_id=machine_id, is_active=True).first()
+        if not vm:
+            print(f"[VMLogsUpload] ERRO - VM não encontrada para machine_id='{machine_id}'")
+            return JsonResponse({'erro': 'VM não encontrada'}, status=404)
+
+        # Diretório destino: media/logs/<vm_id>/
+        import os
+        from django.conf import settings
+        subdir = os.path.join('logs', str(vm.id))
+        abs_dir = os.path.join(settings.MEDIA_ROOT, subdir)
+        os.makedirs(abs_dir, exist_ok=True)
+
+        # Processar arquivo .alog e extrair apenas a imagem
+        try:
+            # Ler arquivo .alog diretamente da memória
+            alog_data = b''
+            for chunk in upload.chunks():
+                alog_data += chunk
+            
+            print(f"[VMLogsUpload] Processando arquivo .alog de {len(alog_data)} bytes")
+            
+            # Formato: 'ALOG'(4) + version(4) + json_len(8) + img_len(8) + json + img
+            if len(alog_data) < 24:  # Tamanho mínimo do header
+                raise ValueError('Arquivo .alog muito pequeno')
+                
+            magic = alog_data[:4]
+            if magic != b'ALOG':
+                raise ValueError(f'Arquivo não possui assinatura ALOG válida: {magic}')
+            
+            offset = 4
+            _version = int.from_bytes(alog_data[offset:offset+4], 'big', signed=False)
+            offset += 4
+            
+            json_len = int.from_bytes(alog_data[offset:offset+8], 'big', signed=False)
+            offset += 8
+            
+            img_len = int.from_bytes(alog_data[offset:offset+8], 'big', signed=False)
+            offset += 8
+            
+            print(f"[VMLogsUpload] JSON: {json_len} bytes, IMG: {img_len} bytes")
+            
+            # Extrair JSON
+            if json_len > 0 and offset + json_len <= len(alog_data):
+                json_bytes = alog_data[offset:offset+json_len]
+                json_str = json_bytes.decode('utf-8')
+                data = json.loads(json_str)
+                offset += json_len
+            else:
+                data = {}
+            
+            # Extrair e salvar apenas a imagem
+            image_url = None
+            image_mime = None
+            image_width = None
+            image_height = None
+            
+            if img_len > 0 and offset + img_len <= len(alog_data):
+                img_data = alog_data[offset:offset+img_len]
+                print(f"[VMLogsUpload] Extraindo imagem de {len(img_data)} bytes")
+                
+                # Determinar formato da imagem pelos primeiros bytes
+                if img_data.startswith(b'\xff\xd8\xff'):
+                    image_ext = 'jpg'
+                    image_mime = 'image/jpeg'
+                elif img_data.startswith(b'\x89PNG\r\n\x1a\n'):
+                    image_ext = 'png'
+                    image_mime = 'image/png'
+                elif img_data.startswith(b'BM'):
+                    image_ext = 'bmp'
+                    image_mime = 'image/bmp'
+                else:
+                    image_ext = 'jpg'  # Default
+                    image_mime = 'image/jpeg'
+                
+                # Nome do arquivo de imagem baseado no timestamp ou ID
+                timestamp_str = data.get('timestamp', '').replace(':', '-').replace(' ', '_') if data.get('timestamp') else 'unknown'
+                cycle_id = data.get('id', 'unknown')
+                image_filename = f"{cycle_id}_{timestamp_str}.{image_ext}"
+                image_path = os.path.join(abs_dir, image_filename)
+                
+                # Salvar apenas a imagem
+                with open(image_path, 'wb') as img_file:
+                    img_file.write(img_data)
+                
+                # URL pública da imagem
+                image_url = settings.MEDIA_URL + os.path.join(subdir, image_filename).replace('\\', '/')
+                print(f"[VMLogsUpload] Imagem salva: {image_url}")
+                
+                # Tentar obter dimensões da imagem
+                try:
+                    from PIL import Image
+                    with Image.open(image_path) as img:
+                        image_width, image_height = img.size
+                        print(f"[VMLogsUpload] Dimensões da imagem: {image_width}x{image_height}")
+                except ImportError:
+                    print(f"[VMLogsUpload] PIL não disponível, dimensões não extraídas")
+                except Exception as img_err:
+                    print(f"[VMLogsUpload] Erro ao obter dimensões: {img_err}")
+            else:
+                print(f"[VMLogsUpload] Nenhuma imagem encontrada no arquivo .alog")
+
+            # Montar e salvar InspectionResult
+            ts = data.get('timestamp')
+            try:
+                # Normalizar timestamp
+                if isinstance(ts, str):
+                    dt = timezone.datetime.fromisoformat(ts)
+                else:
+                    dt = timezone.now()
+                    
+                if dt.tzinfo is None:
+                    dt = timezone.make_aware(dt, timezone.get_current_timezone())
+            except Exception:
+                dt = timezone.now()
+
+            insp_res = InspectionResult(
+                vm=vm,
+                cycle_id=str(data.get('id') or ''),
+                timestamp=dt,
+                approved=bool(data.get('approved', False)),
+                duration_ms=0,
+                frame=0,
+                reprovadas=0,
+                image_url=image_url,
+                image_mime=image_mime,
+                image_width=image_width,
+                image_height=image_height,
+                result_json=data.get('result') if isinstance(data.get('result'), (dict, list)) else {'raw': data}
+            )
+            
+            insp_res.save()
+            print(f"[VMLogsUpload] InspectionResult criado: ID={insp_res.id}, cycle_id={insp_res.cycle_id}")
+            
+        except Exception as parse_err:
+            # Não falhar upload por erro de parsing; apenas reportar no payload
+            print(f"[VMLogsUpload] Erro ao processar arquivo .alog: {str(parse_err)}")
+            return JsonResponse({'success': True, 'parsed': False, 'error': str(parse_err)})
+
+        return JsonResponse({'success': True, 'parsed': True, 'image_url': image_url})
+        
+    except Exception as e:
+        print(f"[VMLogsUpload] Erro geral: {str(e)}")
+        return JsonResponse({'erro': str(e)}, status=500)
+
+
+class InspectionResultsList(APIView):
+    """Lista resultados de inspeção com filtros"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Filtros
+            vm_id = request.query_params.get('vm_id')
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+            
+            # Query base
+            queryset = InspectionResult.objects.select_related('vm').all()
+            
+            # Aplicar filtros
+            if vm_id:
+                queryset = queryset.filter(vm_id=vm_id)
+            
+            if start_date:
+                try:
+                    start_dt = timezone.datetime.fromisoformat(start_date)
+                    if start_dt.tzinfo is None:
+                        start_dt = timezone.make_aware(start_dt)
+                    queryset = queryset.filter(timestamp__gte=start_dt)
+                except ValueError:
+                    pass
+            
+            if end_date:
+                try:
+                    end_dt = timezone.datetime.fromisoformat(end_date)
+                    if end_dt.tzinfo is None:
+                        end_dt = timezone.make_aware(end_dt)
+                    # Adicionar 23:59:59 para incluir o dia inteiro
+                    end_dt = end_dt.replace(hour=23, minute=59, second=59)
+                    queryset = queryset.filter(timestamp__lte=end_dt)
+                except ValueError:
+                    pass
+            
+            # Ordenar por timestamp decrescente (mais recentes primeiro)
+            queryset = queryset.order_by('-timestamp')
+            
+            # Serializar dados
+            results = []
+            for result in queryset:
+                results.append({
+                    'id': result.id,
+                    'vm_id': result.vm.id,
+                    'vm_name': result.vm.name,
+                    'vm_status': result.vm.connection_status,
+                    'cycle_id': result.cycle_id,
+                    'timestamp': result.timestamp.isoformat(),
+                    'approved': result.approved,
+                    'duration_ms': result.duration_ms,
+                    'frame': result.frame,
+                    'reprovadas': result.reprovadas,
+                    'image_url': result.image_url,
+                    'image_mime': result.image_mime,
+                    'image_width': result.image_width,
+                    'image_height': result.image_height,
+                    'result_json': result.result_json
+                })
+            
+            return Response({'data': results})
+            
+        except Exception as e:
+            return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class VMAction(APIView):
