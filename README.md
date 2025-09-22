@@ -14,6 +14,9 @@ O projeto está em desenvolvimento ativo com as seguintes funcionalidades implem
 - **Sistema de Tools**: Ferramentas modulares para inspeção visual
 - **Comandos da API**: Gerenciamento dinâmico de tools via API
 - **Sistema de Testes**: Testes automatizados com backup/restauração
+- **Sistema de Logging**: Logging completo de resultados de inspeção
+- **Gestão de Resultados**: Visualização e análise de resultados salvos
+- **Interface de Gerenciamento**: Páginas web para controle de logs e resultados
 
 ### 🔧 **Sistema de Tools**
 O projeto inclui um sistema completo de ferramentas de visão computacional:
@@ -26,6 +29,19 @@ O projeto inclui um sistema completo de ferramentas de visão computacional:
 
 > 📖 **Para informações detalhadas sobre as tools, consulte o [TOOLS_README.md](vision_machine/TOOLS_README.md)**
 
+### 📊 **Sistema de Logging e Resultados**
+Sistema completo para captura, armazenamento e análise de resultados de inspeção:
+
+- **Logging Local**: Arquivos `.alog` com formato binário otimizado
+- **Buffer em Memória**: Escrita assíncrona em lote para performance
+- **Sincronização**: Upload automático para o orquestrador Django
+- **Interface Web**: Página "Log de Inspeções" para gerenciamento
+- **Visualização**: Modal com `AoVivoImg` para análise detalhada
+- **Filtros**: Busca por VM, data e status de aprovação
+- **Retenção**: Políticas inteligentes de limpeza de logs
+
+> 📖 **Para informações detalhadas sobre o sistema de logging, consulte o [README.md da VM](vision_machine/README.md)**
+
 ## Principais recursos
 
 - Montagem visual de pipelines (drag & drop)
@@ -35,6 +51,9 @@ O projeto inclui um sistema completo de ferramentas de visão computacional:
 - **Vision Machine**: Servidor dedicado para processamento de visão computacional
 - **Sistema de Tools**: Ferramentas modulares e configuráveis via JSON
 - **Comandos da API**: Gerenciamento dinâmico de tools em tempo real
+- **Sistema de Logging**: Captura e armazenamento de resultados de inspeção
+- **Interface de Gerenciamento**: Controle completo via interface web
+- **Análise de Resultados**: Visualização detalhada com overlays e métricas
 
 ## Stack
 
@@ -65,6 +84,9 @@ O projeto inclui um sistema completo de ferramentas de visão computacional:
 - NumPy (computação numérica)
 - Flask-SocketIO (WebSocket para comunicação em tempo real)
 - Sistema de ferramentas modulares (grayscale, blob, math)
+- Sistema de logging com arquivos `.alog`
+- Buffer em memória para performance
+- Sincronização automática com orquestrador
 
 ## Arquitetura
 
@@ -106,10 +128,12 @@ python vm.py --machine-id vm_001 --django-url http://localhost:8000
 ```
 
 **Endpoints da Vision Machine:**
-- `/api/control` - Comandos de controle (config_tool, delete_tool, etc.)
+- `/api/control` - Comandos de controle (config_tool, delete_tool, clear_logs, etc.)
 - `/api/inspection_config` - Configuração das tools
 - `/api/source_config` - Configuração da fonte de imagens
 - `/api/trigger_config` - Configuração do trigger
+- `/api/logging_config` - Configuração do sistema de logging
+- `/api/logs/sync` - Sincronização de logs com orquestrador
 - WebSocket para comunicação em tempo real
 
 **Fontes de imagem suportadas (Vision Machine):** `pasta`, `camera`, `camera_IP`, `picamera2`.
@@ -204,6 +228,36 @@ analyticLens/
 
 > 📖 **Para configuração detalhada, comandos da API e explicação dos parâmetros, consulte o [TOOLS_README.md](vision_machine/TOOLS_README.md)**
 
+## Sistema de Logging e Resultados
+
+### 🗂️ **Arquivos .alog**
+Formato binário otimizado para armazenamento de resultados:
+- **Cabeçalho**: Magic bytes + versão + tamanhos
+- **JSON**: Dados da inspeção (ferramentas, resultados, métricas)
+- **JPEG**: Imagem da inspeção (qualidade 80)
+
+### 🔄 **Fluxo de Sincronização**
+1. **VM**: Gera logs localmente em buffer de memória
+2. **Flush**: Escrita assíncrona em lote para arquivos `.alog`
+3. **Upload**: Sincronização automática com orquestrador Django
+4. **Processamento**: Extração de imagem e salvamento no banco
+5. **Limpeza**: Remoção de arquivos enviados com sucesso
+
+### 🖥️ **Interface de Gerenciamento**
+- **Página "Log de Inspeções"**: Controle completo via web
+- **Tabela de VMs**: Status de logging e configurações
+- **Configuração**: Modal para ajustar parâmetros de logging
+- **Resultados**: Lista filtrada com busca por data e VM
+- **Visualização**: Modal com `AoVivoImg` para análise detalhada
+
+### ⚙️ **Configurações Disponíveis**
+- **Política**: `ALL`, `APPROVED`, `REJECTED`
+- **Retenção**: `keep_last`, `keep_first`
+- **Buffer**: Tamanho e intervalo de flush
+- **Limite**: Máximo de arquivos por VM
+
+> 📖 **Para documentação completa do sistema de logging, consulte o [README.md da VM](vision_machine/README.md)**
+
 ## Build e deploy do front via Django (SPA)
 
 - Dev:
@@ -268,6 +322,11 @@ Os diagramas estão em formato PlantUML (`.puml`) e podem ser visualizados:
 - Vision Machine com sistema de tools
 - Comandos da API para gerenciamento de tools
 - Sistema de testes automatizados
+- **Sistema de logging completo** com arquivos `.alog`
+- **Interface de gerenciamento** para logs e resultados
+- **Sincronização automática** entre VM e orquestrador
+- **Visualização de resultados** com `AoVivoImg` em modo readonly
+- **Filtros e busca** por VM, data e status
 
 ### 🚧 **Em Desenvolvimento**
 - Interface visual para configuração de tools
@@ -279,6 +338,8 @@ Os diagramas estão em formato PlantUML (`.puml`) e podem ser visualizados:
 - Pipelines: execução síncrona (MVP) → assíncrona (jobs) quando necessário
 - Streaming: eventos via WebSocket; frames JPEG no MVP; evoluir para WebRTC/RTSP
 - Sistema de plugins para ferramentas customizadas
+- **Melhorias no sistema de logging**: compressão, indexação, métricas avançadas
+- **Sistema de usuários**: autenticação JWT, controle de permissões (RBAC)
 
 ## Scripts úteis
 
@@ -301,14 +362,30 @@ npm run build
 cd vision_machine
 python vm.py --machine-id vm_001 --django-url http://localhost:8000
 python test_tools.py  # Executar testes das tools
+python test_vm.py     # Executar teste completo incluindo logging
+```
+
+### Sistema de Logging
+```bash
+# Configurar logging na VM
+curl -X PUT http://localhost:5000/api/logging_config \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"policy":"ALL","batch_size":10,"batch_ms":1000}'
+
+# Sincronizar logs com orquestrador
+curl -X POST http://localhost:8000/api/vms/{vm_id}/sync_logs
+
+# Limpar logs da VM
+curl -X POST http://localhost:8000/api/vms/{vm_id}/clear_logs
 ```
 
 ## 🆘 **Suporte e Documentação**
 
 - **README Geral**: Este arquivo (visão geral do projeto)
 - **TOOLS_README.md**: Documentação completa do sistema de tools
+- **README da VM**: Documentação detalhada do sistema de logging
 - **Modelagem UML**: Diagramas na pasta `modelagem/`
-- **Testes**: Sistema automatizado em `vision_machine/test_tools.py`
+- **Testes**: Sistema automatizado em `vision_machine/test_tools.py` e `test_vm.py`
 
 ## 🤝 **Contribuindo**
 

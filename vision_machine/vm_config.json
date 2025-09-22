@@ -25,36 +25,36 @@
       },
       {
         "order_index": 1,
-        "name": "blob_1",
+        "name": "blob_2",
         "type": "blob",
         "ROI": {
           "shape": "rect",
           "rect": {
-            "x": 213.0897094277376,
-            "y": 55.87108234995557,
-            "w": 296.84811572135516,
-            "h": 348.17155183352367
+            "x": 146.17434335744196,
+            "y": 48.72478111914732,
+            "w": 475.50564649156195,
+            "h": 391.6990229666286
           }
         },
         "inspec_pass_fail": true,
-        "th_min": 30,
-        "th_max": 255,
-        "area_min": 1000,
-        "area_max": 2000,
+        "th_min": 0,
+        "th_max": 60,
+        "area_min": 0,
+        "area_max": 3000000,
         "total_area_test": false,
         "blob_count_test": true,
-        "test_total_area_min": 50,
-        "test_total_area_max": 10000,
-        "test_blob_count_min": 8,
-        "test_blob_count_max": 8,
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
+        "test_total_area_min": 0,
+        "test_total_area_max": 1000,
+        "test_blob_count_min": 1,
+        "test_blob_count_max": 1,
+        "contour_chain": "SIMPLE",
+        "approx_epsilon_ratio": 0.03,
+        "polygon_max_points": 10000
       }
     ],
     "source_config": {
       "type": "pasta",
-      "folder_path": "./testBlob_images",
+      "folder_path": "./test_theshold",
       "fps": 30,
       "resolution": [
         752,
@@ -62,7 +62,8 @@
       ]
     },
     "trigger_config": {
-      "type": "trigger"
+      "type": "continuous",
+      "interval_ms": 500
     }
   },
   "source_config": {
@@ -73,12 +74,12 @@
       480
     ],
     "fps": 30,
-    "folder_path": "./testBlob_images",
+    "folder_path": "./test_theshold",
     "rtsp_url": ""
   },
   "trigger_config": {
-    "type": "trigger",
-    "interval_ms": 1000
+    "type": "continuous",
+    "interval_ms": 500
   },
   "logging": {
     "enabled": true,
@@ -90,5 +91,5 @@
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-14T06:26:29.049139"
+  "last_saved": "2025-09-22T20:30:08.497899"
 }

@@ -51,8 +51,11 @@ class BlobTool(BaseTool):
                 except Exception:
                     pass
 
-            # Aplicar threshold simples (análise interna, não altera imagem base do pipeline)
-            _, binary = cv2.threshold(gray_image, self.th_min, self.th_max, cv2.THRESH_BINARY)
+            # Limiarização por faixa [th_min, th_max] para detectar regiões escuras/claras conforme configurado
+            # Mantém mesma interface de parâmetros, mas aplica corretamente o intervalo desejado
+            lo = int(max(0, min(255, self.th_min)))
+            hi = int(max(lo, min(255, self.th_max)))
+            binary = cv2.inRange(gray_image, lo, hi)
 
             # Aplicar máscara DEPOIS do threshold também, garantindo que contornos fiquem restritos ao shape
             if roi_mask is not None:

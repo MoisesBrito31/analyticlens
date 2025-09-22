@@ -125,15 +125,22 @@ Observações:
 - `GET/PUT /api/logging_config` - Configuração de logging de resultados
 - `GET /api/error` - Informações de erro
 
-## 🧾 Logging de Resultados (VM 11)
+## 🧾 Sistema de Logging de Resultados
 
-### Visão Geral
-- Logging local em disco com escrita assíncrona em lote.
-- Cada resultado é gravado em um único arquivo `.alog` contendo cabeçalho + JSON + JPEG.
-- Retenção configurável: `keep_last` (remove antigos) ou `keep_first` (rejeita novos quando cheio).
+### 📋 **Visão Geral**
+Sistema completo de logging de resultados de inspeção com armazenamento local, sincronização com orquestrador e interface de gerenciamento.
 
-### Configuração (vm_config.json)
-Chave `logging` (também editável via `PUT /api/logging_config`):
+**Características principais:**
+- ✅ **Logging local**: Arquivos `.alog` com formato binário otimizado
+- ✅ **Buffer em memória**: Escrita assíncrona em lote para performance
+- ✅ **Sincronização**: Upload automático para o orquestrador Django
+- ✅ **Retenção inteligente**: Políticas `keep_last` e `keep_first`
+- ✅ **Filtros**: Logging por política (`ALL`, `APPROVED`, `REJECTED`)
+- ✅ **Interface web**: Gerenciamento via frontend Vue.js
+
+### ⚙️ **Configuração**
+
+#### **Arquivo de Configuração (vm_config.json)**
 ```json
 {
   "logging": {
@@ -142,70 +149,281 @@ Chave `logging` (também editável via `PUT /api/logging_config`):
     "max_logs": 1000,
     "policy": "ALL",              
     "batch_size": 20,               
-    "batch_ms": 500                 
+    "batch_ms": 500,
+    "buffer_size": 0
   }
 }
 ```
-- `enabled`: ativa/desativa logging
-- `mode`: `keep_last`|`keep_first`
-- `max_logs`: limite máximo de arquivos `.alog` (0 desativa persistência)
-- `policy`: `ALL`|`APPROVED`|`REJECTED`
-- `batch_size`/`batch_ms`: critérios de flush do buffer de RAM
 
-### Endpoints
-- `GET /api/logging_config` → retorna config e `buffer_size`
-- `PUT /api/logging_config` → atualiza config
-- `GET /api/status` inclui:
-  - `logging_config`
-  - `logging_buffer_size`
-  - `logs_count` (quantidade de `.alog` no diretório)
+**Parâmetros:**
+- `enabled`: Ativa/desativa o sistema de logging
+- `mode`: `keep_last` (remove antigos) | `keep_first` (rejeita novos quando cheio)
+- `max_logs`: Limite máximo de arquivos `.alog` (0 = sem limite)
+- `policy`: `ALL` | `APPROVED` | `REJECTED` (filtro de resultados)
+- `batch_size`: Quantidade de logs para flush do buffer
+- `batch_ms`: Intervalo máximo (ms) para flush do buffer
+- `buffer_size`: Tamanho atual do buffer (somente leitura)
 
-### Operação
-- A VM mantém um buffer de resultados em RAM; um worker assíncrono grava em lote.
-- Imagem gravada em JPEG (qualidade 80); JSON sem o array da imagem.
-- Diretório padrão dos logs: `./logs` (ao lado de `vm_config.json`).
+#### **Configuração via API**
+```bash
+# Atualizar configuração
+curl -X PUT http://localhost:5000/api/logging_config \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"policy":"ALL","batch_size":10,"batch_ms":1000}'
 
-### Formato do arquivo .alog
-Estrutura binária:
-- Magic: `ALOG` (4 bytes)
-- Versão: `uint32` (big endian)
-- JSON length: `uint64` (big endian)
-- JPEG length: `uint64` (big endian)
-- JSON bytes (UTF-8)
-- JPEG bytes (opcional)
-
-Leitura simples em Python:
-```python
-import struct, json
-
-with open('logs/2025-09-12_12-00-00_<uuid>.alog','rb') as f:
-    magic = f.read(4)
-    assert magic == b'ALOG'
-    version = struct.unpack('>I', f.read(4))[0]
-    jlen = struct.unpack('>Q', f.read(8))[0]
-    ilen = struct.unpack('>Q', f.read(8))[0]
-    jbytes = f.read(jlen)
-    ib = f.read(ilen) if ilen else b''
-    data = json.loads(jbytes.decode('utf-8'))
+# Consultar configuração atual
+curl http://localhost:5000/api/logging_config
 ```
 
-### Teste Rápido
-1. Habilite logging:
+### 📡 **Endpoints da API**
+
+#### **Configuração de Logging**
+- `GET /api/logging_config` - Consultar configuração atual
+- `PUT /api/logging_config` - Atualizar configuração
+
+#### **Controle de Logs**
+- `POST /api/control` com `{"command": "clear_logs"}` - Limpar logs do disco
+- `POST /api/logs/sync` - Sincronizar logs com orquestrador
+
+#### **Status da VM**
+- `GET /api/status` inclui:
+  - `logging_config`: Configuração atual
+  - `logging_buffer_size`: Tamanho do buffer em memória
+  - `logs_count`: Quantidade de arquivos `.alog` no disco
+
+### 🗂️ **Formato do Arquivo .alog**
+
+#### **Estrutura Binária**
+```
+┌─────────────┬─────────────┬─────────────┬─────────────┬─────────────┬─────────────┐
+│ Magic (4B)  │ Version (4B)│ JSON Len(8B)│ JPEG Len(8B)│ JSON Data   │ JPEG Data   │
+│ "ALOG"      │ uint32 BE   │ uint64 BE   │ uint64 BE   │ UTF-8       │ Binary      │
+└─────────────┴─────────────┴─────────────┴─────────────┴─────────────┴─────────────┘
+```
+
+#### **Conteúdo do JSON**
+```json
+{
+  "inspection_summary": {
+    "frame": 42,
+    "total_processing_time_ms": 15.67,
+    "tools_count": 2,
+    "approved_count": 1,
+    "rejected_count": 1
+  },
+  "tools": [
+    {
+      "order_index": 0,
+      "name": "grayscale_filter",
+      "type": "grayscale",
+      "ROI": {"shape": "rect", "rect": {"x": 0, "y": 0, "w": 640, "h": 480}},
+      "inspec_pass_fail": false
+    }
+  ],
+  "result": [
+    {
+      "order_index": 0,
+      "name": "grayscale_filter",
+      "type": "grayscale",
+      "inspec_pass_fail": false,
+      "processing_time_ms": 2.34
+    }
+  ],
+  "aprovados": 1,
+  "reprovados": 1,
+  "frame": 42,
+  "time": "15.67ms"
+}
+```
+
+#### **Leitura em Python**
+```python
+import struct
+import json
+from datetime import datetime
+
+def read_alog_file(filepath):
+    """Lê um arquivo .alog e retorna JSON + imagem"""
+    with open(filepath, 'rb') as f:
+        # Ler cabeçalho
+        magic = f.read(4)
+        assert magic == b'ALOG', "Arquivo inválido"
+        
+        version = struct.unpack('>I', f.read(4))[0]
+        json_len = struct.unpack('>Q', f.read(8))[0]
+        jpeg_len = struct.unpack('>Q', f.read(8))[0]
+        
+        # Ler dados
+        json_data = f.read(json_len)
+        jpeg_data = f.read(jpeg_len) if jpeg_len > 0 else b''
+        
+        # Parse JSON
+        result = json.loads(json_data.decode('utf-8'))
+        
+        return {
+            'version': version,
+            'json': result,
+            'image': jpeg_data,
+            'image_size': jpeg_len
+        }
+
+# Exemplo de uso
+log_data = read_alog_file('logs/2025-01-15_14-30-25_abc123.alog')
+print(f"Frame: {log_data['json']['frame']}")
+print(f"Aprovados: {log_data['json']['aprovados']}")
+```
+
+### 🔄 **Sincronização com Orquestrador**
+
+#### **Fluxo de Sincronização**
+1. **Trigger**: Comando `sync_logs` via API ou interface web
+2. **Upload**: VM envia arquivos `.alog` para Django via `POST /api/logs/upload`
+3. **Processamento**: Django extrai imagem e salva no banco de dados
+4. **Limpeza**: VM remove arquivos enviados com sucesso
+5. **Atualização**: Frontend atualiza contadores e listas
+
+#### **Comando de Sincronização**
 ```bash
+# Via API da VM
+curl -X POST http://localhost:5000/api/logs/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"django_url": "http://localhost:8000"}'
+
+# Via API do Orquestrador
+curl -X POST http://localhost:8000/api/vms/{vm_id}/sync_logs
+```
+
+### 🧪 **Testes e Validação**
+
+#### **Teste Automatizado**
+```bash
+# Executar teste completo de logging
+python test_vm.py
+
+# O teste inclui:
+# 1. Backup da configuração atual
+# 2. Habilitação do logging
+# 3. Processamento de frames
+# 4. Verificação de criação de .alog
+# 5. Restauração da configuração original
+```
+
+#### **Teste Manual**
+```bash
+# 1. Habilitar logging
 curl -X PUT http://localhost:5000/api/logging_config \
   -H 'Content-Type: application/json' \
   -d '{"enabled":true,"policy":"ALL","batch_size":2,"batch_ms":200}'
-```
-2. Configure trigger contínuo e inicie a inspeção:
-```bash
-curl -X PUT http://localhost:5000/api/trigger_config -H 'Content-Type: application/json' -d '{"type":"continuous","interval_ms":300}'
-curl -X POST http://localhost:5000/api/control -H 'Content-Type: application/json' -d '{"command":"start_inspection","params":{}}'
-```
-3. Aguarde alguns segundos e valide o status:
-```bash
+
+# 2. Iniciar inspeção contínua
+curl -X PUT http://localhost:5000/api/trigger_config \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"continuous","interval_ms":300}'
+
+curl -X POST http://localhost:5000/api/control \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"start_inspection","params":{}}'
+
+# 3. Aguardar e verificar
+sleep 5
 curl http://localhost:5000/api/status | jq '.logs_count, .logging_buffer_size'
+
+# 4. Verificar arquivos
+ls -la logs/*.alog
 ```
-4. Arquivos `.alog` estarão em `vision_machine/logs`.
+
+### 📊 **Monitoramento e Métricas**
+
+#### **Métricas Disponíveis**
+- **`logs_count`**: Quantidade de arquivos `.alog` no disco
+- **`logging_buffer_size`**: Tamanho atual do buffer em memória
+- **`batch_size`**: Configuração de flush do buffer
+- **`batch_ms`**: Intervalo de flush configurado
+
+#### **Logs de Sistema**
+```bash
+# Logs da VM mostram atividade de logging
+tail -f vision_machine.log | grep -i log
+
+# Exemplo de saída:
+# [INFO] Logging habilitado: policy=ALL, max_logs=1000
+# [DEBUG] Buffer de logs: 5/20 itens
+# [INFO] Flush de logs: 20 itens salvos em disco
+# [DEBUG] Arquivo .alog criado: logs/2025-01-15_14-30-25_abc123.alog
+```
+
+### 🗂️ **Estrutura de Diretórios**
+
+```
+vision_machine/
+├── logs/                          # Diretório de logs (criado automaticamente)
+│   ├── 2025-01-15_14-30-25_abc123.alog
+│   ├── 2025-01-15_14-30-26_def456.alog
+│   └── ...
+├── vm_config.json                 # Configuração da VM
+├── vm.py                         # Servidor principal
+└── requirements.txt              # Dependências
+```
+
+### ⚠️ **Considerações Importantes**
+
+#### **Performance**
+- **Buffer em memória**: Evita I/O síncrono durante inspeção
+- **Escrita em lote**: Otimiza operações de disco
+- **Compressão JPEG**: Reduz tamanho dos arquivos
+
+#### **Armazenamento**
+- **Retenção automática**: Remove logs antigos quando necessário
+- **Limite configurável**: Evita esgotamento de espaço em disco
+- **Sincronização**: Upload automático para orquestrador
+
+#### **Recuperação**
+- **Backup automático**: Configuração original preservada em testes
+- **Rollback**: Restauração automática em caso de erro
+- **Validação**: Verificação de integridade dos arquivos
+
+### 🔧 **Troubleshooting**
+
+#### **Problemas Comuns**
+
+**1. Logs não sendo criados**
+```bash
+# Verificar se logging está habilitado
+curl http://localhost:5000/api/logging_config | jq '.enabled'
+
+# Verificar status da VM
+curl http://localhost:5000/api/status | jq '.inspection_running'
+```
+
+**2. Buffer não fazendo flush**
+```bash
+# Verificar configuração do buffer
+curl http://localhost:5000/api/logging_config | jq '.batch_size, .batch_ms'
+
+# Forçar flush (reduzir batch_size temporariamente)
+curl -X PUT http://localhost:5000/api/logging_config \
+  -H 'Content-Type: application/json' \
+  -d '{"batch_size":1,"batch_ms":100}'
+```
+
+**3. Sincronização falhando**
+```bash
+# Verificar conectividade com orquestrador
+curl -X POST http://localhost:5000/api/logs/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"django_url": "http://localhost:8000"}'
+
+# Verificar logs da VM
+tail -f vision_machine.log | grep -i sync
+```
+
+### 📈 **Próximas Melhorias**
+
+- **Compressão**: Implementar compressão adicional dos arquivos
+- **Indexação**: Índices para busca rápida por critérios
+- **Métricas avançadas**: Estatísticas de performance e uso
+- **Backup automático**: Sincronização com sistemas de backup
+- **Alertas**: Notificações para problemas de armazenamento
 
 ## 🧪 **Testes**
 
