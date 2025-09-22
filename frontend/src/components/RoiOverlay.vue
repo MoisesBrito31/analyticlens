@@ -65,7 +65,8 @@
     <!-- Blobs: contornos -->
     <g v-if="showBlobContours && hasContours">
       <template v-for="(path, i) in contourPaths" :key="`cp_${i}`">
-        <path :d="path" :fill="analysisColors.fillContour" :stroke="analysisColors.fillContour" stroke-width="0.8" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" shape-rendering="geometricPrecision" />
+        <!-- Preenchimento com regra evenodd para manter buracos vazios -->
+        <path :d="path" fill-rule="evenodd" :fill="analysisColors.fillContour" :stroke="analysisColors.strokeMed" stroke-width="1.0" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" shape-rendering="geometricPrecision" />
       </template>
     </g>
   </svg>

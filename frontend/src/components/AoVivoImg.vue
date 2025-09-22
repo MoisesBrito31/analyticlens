@@ -803,7 +803,13 @@ function toggleBlobContours() {
 const hasContours = computed(() => {
   const it = selectedItem.value
   if (!it || typeof it !== 'object') return false
-  return Array.isArray(it.blobs) && it.blobs.some(b => Array.isArray(b?.contour) && b.contour.length >= 3)
+  if (!Array.isArray(it.blobs)) return false
+  return it.blobs.some(b => {
+    if (Array.isArray(b?.contours) && b.contours.length) {
+      return b.contours.some(poly => Array.isArray(poly) && poly.length >= 3)
+    }
+    return Array.isArray(b?.contour) && b.contour.length >= 3
+  })
 })
 
 const contourPaths = computed(() => {
@@ -828,9 +834,22 @@ const contourPaths = computed(() => {
     d += ' Z'
     return d
   }
-  return blobs
-    .map(b => Array.isArray(b.contour) ? toPath(b.contour) : '')
-    .filter(p => p)
+  const blobPaths = []
+  for (const b of blobs) {
+    if (Array.isArray(b?.contours) && b.contours.length) {
+      // Combinar subcaminhos em um único path para permitir fill-rule="evenodd"
+      const parts = []
+      for (const poly of b.contours) {
+        const p = toPath(poly)
+        if (p) parts.push(p)
+      }
+      if (parts.length) blobPaths.push(parts.join(' '))
+    } else if (Array.isArray(b?.contour)) {
+      const p = toPath(b.contour)
+      if (p) blobPaths.push(p)
+    }
+  }
+  return blobPaths
 })
 
 // Linhas para tabela de análise de blobs

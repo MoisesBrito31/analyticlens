@@ -64,31 +64,70 @@ class BlobTool(BaseTool):
                 except Exception:
                     pass
             
-            # Encontrar contornos
-            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, self._chain_mode())
-            
-            # Filtrar por área
+            # Detectar componentes conectados para contar apenas pixels na faixa (sem "preencher buracos")
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
+
             valid_blobs = []
-            total_area = 0
-            
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                if self.area_min <= area <= self.area_max:
-                    # Calcular centróide e bounding box
-                    centroid = self._calculate_centroid(contour)
-                    bbox = list(cv2.boundingRect(contour))
+            total_area = 0.0
 
-                    # Contorno com controle de fidelidade
-                    poly = self._build_polygon_from_contour(contour)
+            # label 0 é o fundo
+            for label_id in range(1, num_labels):
+                x = int(stats[label_id, cv2.CC_STAT_LEFT])
+                y = int(stats[label_id, cv2.CC_STAT_TOP])
+                w = int(stats[label_id, cv2.CC_STAT_WIDTH])
+                h = int(stats[label_id, cv2.CC_STAT_HEIGHT])
+                area_pixels = float(stats[label_id, cv2.CC_STAT_AREA])  # exatamente a contagem de pixels na faixa
 
-                    # Informações para WebSocket (sem numpy)
-                    valid_blobs.append({
-                        'area': float(area),
-                        'centroid': centroid,
-                        'bounding_box': bbox,
-                        'contour': poly  # Coordenadas no espaço do ROI
-                    })
-                    total_area += area
+                if not (self.area_min <= area_pixels <= self.area_max):
+                    continue
+
+                cx, cy = centroids[label_id]
+                centroid = (int(round(cx)), int(round(cy)))
+                bbox = [x, y, w, h]
+
+                # Extrair contorno do componente para visualização (opcional)
+                try:
+                    component_mask = (labels[y:y+h, x:x+w] == label_id).astype(np.uint8) * 255
+                    # Encontrar contornos com hierarquia para identificar externos e buracos
+                    comp_contours, hierarchy = cv2.findContours(component_mask, cv2.RETR_CCOMP, self._chain_mode())
+                    outer_contours = []
+                    all_polys = []
+                    if comp_contours is not None and len(comp_contours) > 0:
+                        if hierarchy is not None and len(hierarchy) > 0:
+                            hierarchy = hierarchy[0]
+                        else:
+                            hierarchy = [[-1, -1, -1, -1] for _ in range(len(comp_contours))]
+
+                        for ci, cnt in enumerate(comp_contours):
+                            poly_i = self._build_polygon_from_contour(cnt)
+                            if poly_i:
+                                poly_i = [[int(px + x), int(py + y)] for px, py in poly_i]
+                                all_polys.append(poly_i)
+                            if int(hierarchy[ci][3]) == -1:
+                                outer_contours.append(cnt)
+
+                    if outer_contours:
+                        # usar o maior contorno externo do componente
+                        contour = max(outer_contours, key=cv2.contourArea)
+                        poly = self._build_polygon_from_contour(contour)
+                        if poly:
+                            poly = [[int(px + x), int(py + y)] for px, py in poly]
+                    else:
+                        poly = []
+                except Exception:
+                    poly = []
+                    all_polys = []
+
+                blob_entry = {
+                    'area': float(area_pixels),
+                    'centroid': centroid,
+                    'bounding_box': bbox,
+                    'contour': poly
+                }
+                if 'all_polys' in locals() and all_polys:
+                    blob_entry['contours'] = all_polys
+                valid_blobs.append(blob_entry)
+                total_area += area_pixels
             
             # Calcular área do ROI para referência
             roi_area = roi_image.shape[0] * roi_image.shape[1]

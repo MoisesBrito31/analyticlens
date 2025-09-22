@@ -18,7 +18,7 @@ Backend
 - (BE 2) [x] Acionar atualização de status após comando start (VMAction.post + handlers)
 - (BE 3) [x] Garantir nome do comando manual "trigger_trigger" (preferência atendida)
 - (BE 4) [ ] Endpoint PUT /api/inspection_config com validações e permissões
-- (BE 5) [ ] Listagem/paginação/filtros de inspeções e metadados
+- (BE 5) [-] Listagem/paginação/filtros de inspeções e metadados
 - (BE 6) [ ] Autenticação com sessão/JWT + refresh; CSRF; timeouts
 - (BE 7) [ ] RBAC: permission classes nos endpoints críticos (ex.: vm_action)
 - (BE 8) [ ] Propagar parâmetros de configuração da Tool Blob
@@ -64,11 +64,11 @@ VM (Vision Machine - Servidor Flask)
 - (VM 6) [ ] Adicionar métricas e healthcheck dedicados (ex.: /api/health, uptime)
 - (VM 7) [ ] Cobrir com testes de integração WebSocket (cliente Socket.IO)
 - (VM 8) [ ] Documentar API da VM (README com exemplos curl e eventos WS)
-- (VM 9) [ ] Revisar erros da Tool Blob: manchas pretas não são detectadas e manchas brancas com manchas pretas no seu interior,
+- (VM 9) [X] Revisar erros da Tool Blob: manchas pretas não são detectadas e manchas brancas com manchas pretas no seu interior,
     se pequenas, são ignoradas.
 - (VM 10) [ ] Estudar a viabilidade técnica, sob a ótica de performance, de aplicar JWT entre VM e Orquestrador 
     (considerando o stream do WebSocket)
-- (VM 11) [>] Projetar/implementar logging de resultados (VM responsável por gerar),
+- (VM 11) [X] Projetar/implementar logging de resultados (VM responsável por gerar),
     com foco em performance
   - (VM 11.1) [x] Adicionar seção logging em config (vm_config.json):
     - enabled (bool), mode ("keep_last"|"keep_first"),
@@ -78,12 +78,13 @@ VM (Vision Machine - Servidor Flask)
     - header com tamanhos; bloco JPEG; bloco JSON (fixo)
   - (VM 11.3) [x] Buffer em memória + escrita assíncrona em thread:
     - deque limitado; flush por quantidade/tempo; métrica current_buffer_size
-  - (VM 11.4) [ ] Sincronização com orquestrador:
+  - (VM 11.4) [X] Sincronização com orquestrador:
     - endpoint para iniciar transferência; após OK do orquestrador, apagar transmitidos
   - (VM 11.5) [x] Política de retenção respeitando max_logs e mode:
     - keep_last remove antigos; keep_first rejeita novos quando cheio
-  - (VM 11.6) [ ] Amostragem e imagem:
+  - (VM 11.6) [X] Amostragem e imagem:
     - result_sampling (1/N), result_image ("thumb"|"full"); thumbnail opcional no JSON
+  - (VM 11.7) [ ] falha ao baixar log com VM rodando em uma rede diferente do orquestador (raspbarry)
 - (VM 12) [ ] Adicionar comunicação ModbusTCP para integrar a VM a dispositivos industriais (baixa prioridade)
 - (VM 13) [ ] Adicionar comunicação Ethernet/IP (dispositivos Rockwell) - (baixa prioridade)
 - (VM 14) [ ] Implementar Tool EDGE: dada uma linha, identificar ao longo dela todas as bordas existentes e retornar a quantidade de bordas,
@@ -118,20 +119,20 @@ Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
       - (    ) [X] adicionar função de adicionar ferramentas novas, apagar e duplicar
       - (    ) [X] permitir alterar nome de ferramenta se procupando em que este seja unico
       - (    ) [X] adicionar edição de shapes do ROI de ferramentas     
-        - (QA 3) [ ] QA/Docs: testes de integração FE↔BE↔VM; documentar fluxo e payloads
+        - (QA 3) [X] QA/Docs: testes de integração FE↔BE↔VM; documentar fluxo e payloads
 
-- (VM 11) [ ] Log de resultados (performance e responsabilidade)
-  - (BE 10) [>] Orquestrador (Django): ingestão, retenção e indexação
-    - (BE 10.1) [ ] Modelos e migrações: InspectionResult, ToolResult
+- (VM 11) [X] Log de resultados (performance e responsabilidade)
+  - (BE 10) [X] Orquestrador (Django): ingestão, retenção e indexação
+    - (BE 10.1) [X] Modelos e migrações: InspectionResult, ToolResult
       - Índices: vm_id, inspection_id, timestamp, decision
       - Campos: image_url (string), thumb_base64 (opcional), width, height, tools_json (JSONB)
-    - (BE 10.2) [ ] API de ingestão: POST /api/results (autenticação por token da VM)
+    - (BE 10.2) [X] API de ingestão: POST /api/results (autenticação por token da VM)
       - Validação de schema; aceitar imagem por URL (servida pela VM) ou upload opcional
-    - (BE 10.3) [ ] APIs de leitura: GET /api/results (paginado/filtrado) e GET /api/results/{id}
-    - (BE 10.4) [ ] Rotação/retensão: TTL/tamanho; tarefa agendada de limpeza
-    - (BE 10.5) [ ] Exportação: endpoints CSV/JSON
-  - (VM 11) [ ] VM: envio assíncrono, backoff e correlação (trace-id)
-    - (QA 9) [ ] QA/Docs: testes de throughput; manual de operação e retenção
+    - (BE 10.3) [X] APIs de leitura: GET /api/results (paginado/filtrado) e GET /api/results/{id}
+    - (BE 10.4) [X] Rotação/retensão: TTL/tamanho; tarefa agendada de limpeza
+    - (BE 10.5) [X] Exportação: endpoints CSV/JSON
+  - (VM 11) [X] VM: envio assíncrono, backoff e correlação (trace-id)
+    - (QA 9) [X] QA/Docs: testes de throughput; manual de operação e retenção
 
 - (FE 7) [ ] Gestão dos resultados das inspeções salvas (usabilidade)
   - (VM 1) [ ] VM: garantir payload consistente (mime, resolução, campos result/tools)
