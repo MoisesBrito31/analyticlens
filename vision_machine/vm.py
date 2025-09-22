@@ -632,7 +632,14 @@ class TestModeProcessor:
                 except Exception as e:
                     logger.debug(f"Falha ao anexar imagem ao WebSocket: {str(e)}")
                 
-                logger.info(f"📡 Enviando para WebSocket: {websocket_data}")
+                # Log seguro: evitar imprimir binários/base64 grandes
+                try:
+                    safe_log = dict(websocket_data)
+                    if 'image_base64' in safe_log:
+                        safe_log['image_base64'] = f"<base64:{len(websocket_data.get('image_base64',''))} chars>"
+                    logger.info(f"📡 Enviando para WebSocket: {safe_log}")
+                except Exception:
+                    logger.info("📡 Enviando para WebSocket (payload omitido por segurança)")
                 
                 # Enviar para todos os clientes conectados
                 self.socketio.emit('test_result', websocket_data, namespace='/')
@@ -1816,6 +1823,10 @@ class FlaskVisionServer:
             failed = 0
             remaining_before = getattr(self.vm, 'current_logs_count', lambda: 0)()
             try:
+                logger.info(f"[SYNC] Início: remaining_before={remaining_before}")
+            except Exception:
+                pass
+            try:
                 payload = None
                 try:
                     payload = request.get_json(silent=True) or {}
@@ -1845,8 +1856,16 @@ class FlaskVisionServer:
                             except Exception:
                                 pass
                             uploaded += 1
+                            try:
+                                logger.info(f"[SYNC] Enviado com sucesso: {fname}")
+                            except Exception:
+                                pass
                         else:
                             failed += 1
+                            try:
+                                logger.error(f"[SYNC] Falha ao enviar: {fname} status={resp.status_code}")
+                            except Exception:
+                                pass
                     except Exception:
                         failed += 1
 
@@ -1859,6 +1878,10 @@ class FlaskVisionServer:
                     pass
 
                 remaining_after = getattr(self.vm, 'current_logs_count', lambda: 0)()
+                try:
+                    logger.info(f"[SYNC] Fim: uploaded={uploaded} failed={failed} remaining_after={remaining_after}")
+                except Exception:
+                    pass
                 return jsonify({
                     "success": True,
                     "uploaded": uploaded,

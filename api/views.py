@@ -286,6 +286,12 @@ class VMSyncLogs(APIView):
                     params['django_url'] = vm.django_url
             except Exception:
                 pass
+            # Debug: logar contexto da chamada
+            try:
+                import logging
+                logging.getLogger(__name__).info(f"[VMSyncLogs] Solicitação de sync para VM id={vm.id} machine_id={vm.machine_id} params={params}")
+            except Exception:
+                pass
             result = proto.send_command(vm, 'sync_logs', params=params)
             if not result.get('ok', False):
                 return Response({'erro': result.get('error', 'Falha ao sincronizar logs')}, status=status.HTTP_502_BAD_GATEWAY)
@@ -298,6 +304,11 @@ class VMSyncLogs(APIView):
                     payload[k] = result[k]
             return Response(payload)
         except Exception as e:
+            try:
+                import logging
+                logging.getLogger(__name__).exception("[VMSyncLogs] Erro no sync")
+            except Exception:
+                pass
             return Response({'erro': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

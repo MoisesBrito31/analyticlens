@@ -114,7 +114,11 @@ pip install --upgrade pip
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser  # crie um usuário admin
+# Para acesso apenas local:
 python manage.py runserver
+
+# Para acesso a partir de outras máquinas na rede (recomendado para a VM):
+python manage.py runserver 0.0.0.0:8000
 ```
 
 ### Vision Machine
@@ -378,6 +382,16 @@ curl -X POST http://localhost:8000/api/vms/{vm_id}/sync_logs
 # Limpar logs da VM
 curl -X POST http://localhost:8000/api/vms/{vm_id}/clear_logs
 ```
+
+### Observabilidade / Debug rápido
+
+- **Quando a VM estiver em outra máquina**: garanta que o backend Django esteja acessível na rede usando `runserver 0.0.0.0:8000` (ou seu host/porta desejados).
+- **Logs do ciclo de sincronização de logs**:
+  - Na VM: linhas com prefixo `[SYNC]` indicam início/fim e cada arquivo `.alog` enviado.
+  - No Orquestrador (Django):
+    - View `VMSyncLogs`: linhas `[VMSyncLogs]` ao disparar o sync.
+    - `ProtocoloVM`: logs de URL/body/resposta do `sync_logs`.
+  - Os logs não imprimem binários; payloads grandes são mascarados.
 
 ## 🆘 **Suporte e Documentação**
 

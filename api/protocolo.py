@@ -316,7 +316,10 @@ class ProtocoloVM:
         try:
             url = f"{self._base_url(vm)}/api/logs/sync"
             if hasattr(self, '_logger') and self._logger:
-                self._logger.debug(f"ProtocoloVM: POST sync logs -> {url}")
+                try:
+                    self._logger.debug(f"ProtocoloVM: POST sync logs -> {url} | vm_id={vm.id} machine_id={vm.machine_id}")
+                except Exception:
+                    pass
             # A sincronização pode levar mais tempo (upload de vários arquivos)
             sync_timeout = max(self.request_timeout_seconds, 60.0)
             body = {}
@@ -325,13 +328,28 @@ class ProtocoloVM:
                     body['django_url'] = params.get('django_url')
             except Exception:
                 pass
+            if hasattr(self, '_logger') and self._logger:
+                try:
+                    self._logger.debug(f"ProtocoloVM: BODY sync logs -> {body}")
+                except Exception:
+                    pass
             res = requests.post(url, json=body, timeout=sync_timeout)
             res.raise_for_status()
             data = res.json()
+            if hasattr(self, '_logger') and self._logger:
+                try:
+                    self._logger.debug(f"ProtocoloVM: RESP sync logs <- {data}")
+                except Exception:
+                    pass
             # Atualiza status após sincronização
             self.update_status(vm, True)
             return {'ok': True, **({k: v for k, v in (data or {}).items() if k not in ('success',)})}
         except Exception as e:
+            if hasattr(self, '_logger') and self._logger:
+                try:
+                    self._logger.exception("ProtocoloVM: erro durante sync_logs")
+                except Exception:
+                    pass
             return self._handle_http_error(vm, e, True)
 
 
