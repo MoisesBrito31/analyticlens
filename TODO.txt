@@ -84,7 +84,7 @@ VM (Vision Machine - Servidor Flask)
     - keep_last remove antigos; keep_first rejeita novos quando cheio
   - (VM 11.6) [X] Amostragem e imagem:
     - result_sampling (1/N), result_image ("thumb"|"full"); thumbnail opcional no JSON
-  - (VM 11.7) [ ] falha ao baixar log com VM rodando em uma rede diferente do orquestador (raspbarry)
+  - (VM 11.7) [X] falha ao baixar log com VM rodando em uma rede diferente do orquestador (raspbarry)
 - (VM 12) [ ] Adicionar comunicação ModbusTCP para integrar a VM a dispositivos industriais (baixa prioridade)
 - (VM 13) [ ] Adicionar comunicação Ethernet/IP (dispositivos Rockwell) - (baixa prioridade)
 - (VM 14) [ ] Implementar Tool EDGE: dada uma linha, identificar ao longo dela todas as bordas existentes e retornar a quantidade de bordas,
