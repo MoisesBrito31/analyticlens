@@ -46,7 +46,7 @@
                         :mime-type="liveMime"
                         :ratio="liveRatio"
                         :results="liveTools"
-                        :tool-defs="liveToolDefs"
+                        :tool-defs="toolsItems"
                         :tools="toolsItems"
                         :resolution="liveResolution"
                         :metrics="metrics"
@@ -324,7 +324,17 @@ function connectWebSocket() {
               polygon_max_points: t.polygon_max_points,
               operation: t.operation,
               reference_tool_id: t.reference_tool_id,
-              custom_formula: t.custom_formula
+              custom_formula: t.custom_formula,
+              // Locate
+              threshold_mode: t.threshold_mode,
+              threshold: (t.threshold != null ? t.threshold : t.th_min),
+              adaptive_k: t.adaptive_k,
+              polaridade: t.polaridade,
+              edge_select: t.edge_select,
+              smooth_ksize: t.smooth_ksize,
+              grad_kernel: t.grad_kernel,
+              apply_transform: t.apply_transform,
+              arrow: t.arrow
             }))
             vmConfigApplied.value = true
           } catch {}
@@ -386,7 +396,17 @@ watch(selectedInspectionId, async (inspId) => {
       polygon_max_points: t.polygon_max_points,
       operation: t.operation,
       reference_tool_id: t.reference_tool_id,
-      custom_formula: t.custom_formula
+    custom_formula: t.custom_formula,
+    // Locate
+    threshold_mode: t.threshold_mode,
+    threshold: (t.threshold != null ? t.threshold : t.th_min),
+    adaptive_k: t.adaptive_k,
+    polaridade: t.polaridade,
+    edge_select: t.edge_select,
+    smooth_ksize: t.smooth_ksize,
+    grad_kernel: t.grad_kernel,
+    apply_transform: t.apply_transform,
+    arrow: t.arrow
     }))
   } catch {
     toolsItems.value = []
@@ -504,6 +524,16 @@ async function applyToVM() {
         mode: t.mode,
         th_min: t.th_min,
         th_max: t.th_max,
+        // Locate params (se presentes)
+        threshold_mode: t.threshold_mode,
+        threshold: (t.threshold != null ? t.threshold : t.th_min),
+        adaptive_k: t.adaptive_k,
+        polaridade: t.polaridade,
+        edge_select: t.edge_select,
+        smooth_ksize: t.smooth_ksize,
+        grad_kernel: t.grad_kernel,
+        apply_transform: t.apply_transform,
+        arrow: t.arrow,
         kernel: t.kernel,
         open: t.open,
         close: t.close,
@@ -612,6 +642,16 @@ function onUpdateToolParam({ index, key, value, name }) {
       mode: value.mode,
       th_min: value.th_min,
       th_max: value.th_max,
+      // Locate
+      threshold_mode: value.threshold_mode,
+      threshold: (value.threshold != null ? value.threshold : value.th_min),
+      adaptive_k: value.adaptive_k,
+      polaridade: value.polaridade,
+      edge_select: value.edge_select,
+      smooth_ksize: value.smooth_ksize,
+      grad_kernel: value.grad_kernel,
+      apply_transform: value.apply_transform,
+      arrow: value.arrow,
       kernel: value.kernel,
       open: value.open,
       close: value.close,
@@ -672,6 +712,16 @@ function onUpdateInspectionConfig(full) {
     mode: t.mode,
     th_min: t.th_min,
     th_max: t.th_max,
+    // Locate
+    threshold_mode: t.threshold_mode,
+    threshold: (t.threshold != null ? t.threshold : t.th_min),
+    adaptive_k: t.adaptive_k,
+    polaridade: t.polaridade,
+    edge_select: t.edge_select,
+    smooth_ksize: t.smooth_ksize,
+    grad_kernel: t.grad_kernel,
+    apply_transform: t.apply_transform,
+    arrow: t.arrow,
     kernel: t.kernel,
     open: t.open,
     close: t.close,

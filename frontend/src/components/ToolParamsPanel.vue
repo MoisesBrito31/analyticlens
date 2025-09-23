@@ -61,6 +61,7 @@ import BlurParams from '@/components/tool-params/BlurParams.vue'
 import ThresholdParams from '@/components/tool-params/ThresholdParams.vue'
 import MorphologyParams from '@/components/tool-params/MorphologyParams.vue'
 import MathParams from '@/components/tool-params/MathParams.vue'
+import LocateParams from '@/components/tool-params/LocateParams.vue'
 
 const props = defineProps({
   type: { type: String, default: '' },
@@ -191,6 +192,7 @@ const activeComp = computed(() => {
     case 'threshold': return ThresholdParams
     case 'morphology': return MorphologyParams
     case 'math': return MathParams
+    case 'locate': return LocateParams
     default: return null
   }
 })

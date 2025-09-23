@@ -9,6 +9,7 @@ from .models import (
     ThresholdTool,
     MorphologyTool,
     BlobToolConfig,
+    LocateToolConfig,
     MathTool,
     InspectionResult,
 )
@@ -111,6 +112,12 @@ class BlobToolConfigInline(admin.StackedInline):
     can_delete = True
 
 
+class LocateToolConfigInline(admin.StackedInline):
+    model = LocateToolConfig
+    extra = 0
+    can_delete = True
+
+
 class MathToolInline(admin.StackedInline):
     model = MathTool
     fk_name = 'tool'
@@ -131,6 +138,7 @@ class InspectionToolAdmin(admin.ModelAdmin):
         ThresholdToolInline,
         MorphologyToolInline,
         BlobToolConfigInline,
+        LocateToolConfigInline,
         MathToolInline,
     ]
     ordering = ['inspection', 'order_index']

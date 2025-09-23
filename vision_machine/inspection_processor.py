@@ -9,6 +9,7 @@ from tools import (
     BlurFilterTool,
     ThresholdFilterTool,
     MorphologyFilterTool,
+    LocateTool,
 )
 
 class InspectionProcessor:
@@ -48,6 +49,8 @@ class InspectionProcessor:
                 return ThresholdFilterTool(config)
             elif tool_type == 'morphology':
                 return MorphologyFilterTool(config)
+            elif tool_type == 'locate':
+                return LocateTool(config)
             elif tool_type == 'math':
                 return MathTool(config)
             else:

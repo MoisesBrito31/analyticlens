@@ -1,5 +1,5 @@
 {
-  "machine_id": "VM_001",
+  "machine_id": "vm_001",
   "django_url": "http://localhost:8000",
   "status": "running",
   "mode": "TESTE",
@@ -30,15 +30,16 @@
         "ROI": {
           "shape": "rect",
           "rect": {
-            "x": 85.75561476969925,
-            "y": 9.095292475574126,
-            "w": 594.3941124222814,
-            "h": 452.76741530262655
+            "x": 244,
+            "y": 142,
+            "w": 276,
+            "h": 201
           }
         },
         "inspec_pass_fail": true,
         "th_min": 200,
         "th_max": 230,
+        "threshold": 200,
         "area_min": 0,
         "area_max": 3000000,
         "total_area_test": false,
@@ -50,11 +51,46 @@
         "contour_chain": "SIMPLE",
         "approx_epsilon_ratio": 0.03,
         "polygon_max_points": 10000
+      },
+      {
+        "order_index": 2,
+        "name": "locate_3",
+        "type": "locate",
+        "ROI": {
+          "shape": "rect",
+          "rect": {
+            "x": 47,
+            "y": 31,
+            "w": 632,
+            "h": 431
+          }
+        },
+        "inspec_pass_fail": false,
+        "threshold_mode": "fixed",
+        "threshold": 20,
+        "adaptive_k": 1,
+        "polaridade": "dark_to_light",
+        "edge_select": "closest_to_mid",
+        "smooth_ksize": 5,
+        "grad_kernel": 3,
+        "apply_transform": false,
+        "arrow": {
+          "p0": {
+            "x": 103,
+            "y": 247
+          },
+          "p1": {
+            "x": 635,
+            "y": 254
+          }
+        }
       }
     ],
     "source_config": {
       "type": "pasta",
+      "camera_id": 0,
       "folder_path": "./test_theshold",
+      "rtsp_url": "",
       "fps": 30,
       "resolution": [
         752,
@@ -68,7 +104,7 @@
   },
   "source_config": {
     "type": "pasta",
-    "camera_id": 999,
+    "camera_id": 0,
     "resolution": [
       752,
       480
@@ -91,5 +127,5 @@
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-22T22:30:14.655439"
+  "last_saved": "2025-09-23T22:21:52.631430"
 }

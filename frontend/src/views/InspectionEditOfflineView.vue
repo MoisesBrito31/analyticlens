@@ -105,7 +105,7 @@
 
                         <!-- Overlay de desenho/edição do ROI -->
                         <svg
-                          v-if="refPreviewUrl && isOverlayActive"
+                          v-if="refPreviewUrl && (isOverlayActive || (selectedTool && selectedTool.type === 'locate' && isArrowActive))"
                           class="roi-overlay"
                           :style="{ width: imgDisplayWidth + 'px', height: imgDisplayHeight + 'px' }"
                           :viewBox="`0 0 ${imgDisplayWidth} ${imgDisplayHeight}`"
@@ -163,6 +163,24 @@
                                 class="roi-rect"
                                 @mousedown.stop="startMove($event)"
                               />
+                            </g>
+                          </template>
+
+                          <!-- Locate Arrow -->
+                          <template v-if="selectedTool && selectedTool.type === 'locate' && displayArrow">
+                            <g>
+                              <line
+                                :x1="displayArrow.p0.x"
+                                :y1="displayArrow.p0.y"
+                                :x2="displayArrow.p1.x"
+                                :y2="displayArrow.p1.y"
+                                stroke="#0d6efd"
+                                stroke-width="2"
+                                @mousedown.stop="startMoveArrow($event)"
+                              />
+                              <!-- endpoints -->
+                              <circle :cx="displayArrow.p0.x" :cy="displayArrow.p0.y" r="6" fill="#0d6efd" @mousedown.stop="startResizeArrow('p0', $event)" />
+                              <circle :cx="displayArrow.p1.x" :cy="displayArrow.p1.y" r="6" fill="#0d6efd" @mousedown.stop="startResizeArrow('p1', $event)" />
                             </g>
                           </template>
                         </svg>
@@ -237,6 +255,14 @@
                             {{ isOverlayActive ? 'Concluir' : 'Desenhar' }}
                           </BButton>
                           <div v-if="isOverlayActive" class="small text-muted">Clique e arraste para desenhar; arraste o retângulo ou os pontos para ajustar.</div>
+                        </div>
+
+                        <!-- Botão para desenhar seta (Locate) -->
+                        <div class="d-flex align-items-center gap-2 mb-2" v-if="selectedTool && selectedTool.type === 'locate'">
+                          <BButton size="sm" variant="outline-info" :disabled="!refPreviewUrl" @click="toggleArrow">
+                            {{ isArrowActive ? 'Concluir seta' : 'Desenhar seta' }}
+                          </BButton>
+                          <div v-if="isArrowActive" class="small text-muted">Clique para iniciar a seta e arraste até o ponto final; arraste os pontos para ajustar.</div>
                         </div>
 
                         <!-- Específicos por tipo -->
@@ -344,6 +370,53 @@
                           </BRow>
                         </div>
 
+                        <div v-else-if="selectedTool.type === 'locate'" class="mb-2">
+                          <div class="mb-1 fw-semibold small text-muted">Locate</div>
+                          <BRow class="g-2">
+                            <BCol cols="12" md="4">
+                              <label class="form-label">threshold_mode</label>
+                              <BFormSelect v-model="selectedTool.threshold_mode" :options="locateModes" />
+                            </BCol>
+                            <BCol cols="12" md="4">
+                              <label class="form-label">threshold</label>
+                              <BFormInput v-model.number="selectedTool.threshold" type="number" :disabled="String(selectedTool.threshold_mode||'fixed')!=='fixed'" />
+                            </BCol>
+                            <BCol cols="12" md="4">
+                              <label class="form-label">adaptive_k</label>
+                              <BFormInput v-model.number="selectedTool.adaptive_k" type="number" step="0.1" :disabled="String(selectedTool.threshold_mode||'fixed')!=='adaptive'" />
+                            </BCol>
+                            <BCol cols="12" md="4">
+                              <label class="form-label">polaridade</label>
+                              <BFormSelect v-model="selectedTool.polaridade" :options="locatePolarities" />
+                            </BCol>
+                            <BCol cols="12" md="4">
+                              <label class="form-label">edge_select</label>
+                              <BFormSelect v-model="selectedTool.edge_select" :options="locateEdgeSelect" />
+                            </BCol>
+                            <BCol cols="6" md="2">
+                              <label class="form-label">smooth_ksize</label>
+                              <BFormInput v-model.number="selectedTool.smooth_ksize" type="number" />
+                            </BCol>
+                            <BCol cols="6" md="2">
+                              <label class="form-label">grad_kernel</label>
+                              <BFormInput v-model.number="selectedTool.grad_kernel" type="number" />
+                            </BCol>
+                            <BCol cols="12" md="6" class="d-flex align-items-end">
+                              <div>
+                                <input type="checkbox" v-model="selectedTool.apply_transform" />
+                                <span class="ms-2">apply_transform</span>
+                              </div>
+                            </BCol>
+                          </BRow>
+                          <div class="mt-2 mb-1 fw-semibold small text-muted">Arrow (p0 → p1)</div>
+                          <BRow class="g-2">
+                            <BCol cols="6" md="3"><label class="form-label small">p0.x</label><BFormInput v-model.number="selectedTool.arrow.p0.x" type="number" /></BCol>
+                            <BCol cols="6" md="3"><label class="form-label small">p0.y</label><BFormInput v-model.number="selectedTool.arrow.p0.y" type="number" /></BCol>
+                            <BCol cols="6" md="3"><label class="form-label small">p1.x</label><BFormInput v-model.number="selectedTool.arrow.p1.x" type="number" /></BCol>
+                            <BCol cols="6" md="3"><label class="form-label small">p1.y</label><BFormInput v-model.number="selectedTool.arrow.p1.y" type="number" /></BCol>
+                          </BRow>
+                        </div>
+
                         <div class="small text-muted">Clique em uma linha abaixo para selecionar.</div>
                       </div>
                       <div v-else class="text-muted small">Selecione uma ferramenta na tabela para editar seus parâmetros.</div>
@@ -409,6 +482,7 @@
                   <BButton size="sm" variant="outline-secondary" @click="addTool('morphology')">Morphology</BButton>
                   <BButton size="sm" variant="outline-secondary" @click="addTool('blob')">Blob</BButton>
                   <BButton size="sm" variant="outline-secondary" @click="addTool('math')">Math</BButton>
+                  <BButton size="sm" variant="outline-secondary" @click="addTool('locate')">Locate</BButton>
                 </div>
 
                 <div class="mt-4 d-flex justify-content-end gap-2">
@@ -472,6 +546,7 @@ const jsonPreview = ref('')
 
 // Overlay de ROI
 const isOverlayActive = ref(false)
+const isArrowActive = ref(false)
 const imgNaturalWidth = ref(0)
 const imgNaturalHeight = ref(0)
 const imgDisplayWidth = ref(0)
@@ -479,6 +554,7 @@ const imgDisplayHeight = ref(0)
 
 const handleSize = 8
 const interaction = ref({ mode: 'idle', startX: 0, startY: 0, baseRect: null, handle: '' })
+const arrowInteraction = ref({ mode: 'idle', startX: 0, startY: 0, moving: false, handle: '' })
 
 const selectedTool = computed(() => {
   if (selectedIdx.value < 0 || selectedIdx.value >= toolsItems.value.length) return null
@@ -710,6 +786,45 @@ function onOverlayMouseDown(e) {
   window.addEventListener('mouseup', onMouseUp)
 }
 
+function toggleArrow() {
+  if (!selectedTool.value || selectedTool.value.type !== 'locate') return
+  isArrowActive.value = !isArrowActive.value
+}
+
+const displayArrow = computed(() => {
+  const t = selectedTool.value
+  if (!t || t.type !== 'locate') return null
+  if (!t.arrow || !t.arrow.p0 || !t.arrow.p1) return null
+  const sx = imgDisplayWidth.value / (imgNaturalWidth.value || imgDisplayWidth.value || 1)
+  const sy = imgDisplayHeight.value / (imgNaturalHeight.value || imgDisplayHeight.value || 1)
+  return {
+    p0: { x: (t.arrow.p0.x || 0) * sx, y: (t.arrow.p0.y || 0) * sy },
+    p1: { x: (t.arrow.p1.x || 0) * sx, y: (t.arrow.p1.y || 0) * sy }
+  }
+})
+
+function startMoveArrow(e) {
+  if (!isArrowActive.value) return
+  const svg = e.currentTarget.ownerSVGElement
+  const rect = svg.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  arrowInteraction.value = { mode: 'moving_arrow', startX: x, startY: y, moving: true, handle: '' }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
+function startResizeArrow(handle, e) {
+  if (!isArrowActive.value) return
+  const svg = e.currentTarget.ownerSVGElement
+  const rect = svg.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  arrowInteraction.value = { mode: 'resizing_arrow', startX: x, startY: y, moving: false, handle }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
 function startMove(e) {
   if (!isOverlayActive.value) return
   const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect()
@@ -750,6 +865,35 @@ function onMouseMove(e) {
   const rect = svg.getBoundingClientRect()
   const x = Math.max(0, Math.min(imgDisplayWidth.value, e.clientX - rect.left))
   const y = Math.max(0, Math.min(imgDisplayHeight.value, e.clientY - rect.top))
+
+  // Arrow interactions (Locate)
+  if (isArrowActive.value && selectedTool.value.type === 'locate') {
+    const t = selectedTool.value
+    // initialize arrow if missing
+    if (!t.arrow || !t.arrow.p0 || !t.arrow.p1) {
+      t.arrow = { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } }
+    }
+    if (arrowInteraction.value.mode === 'moving_arrow') {
+      const dx = x - arrowInteraction.value.startX
+      const dy = y - arrowInteraction.value.startY
+      const toImg = toImageCoords(dx, dy)
+      t.arrow = {
+        p0: { x: Number(t.arrow.p0.x || 0) + toImg.x, y: Number(t.arrow.p0.y || 0) + toImg.y },
+        p1: { x: Number(t.arrow.p1.x || 0) + toImg.x, y: Number(t.arrow.p1.y || 0) + toImg.y }
+      }
+      arrowInteraction.value.startX = x
+      arrowInteraction.value.startY = y
+      return
+    } else if (arrowInteraction.value.mode === 'resizing_arrow') {
+      const toImg = toImageCoords(x, y)
+      if (arrowInteraction.value.handle === 'p0') {
+        t.arrow = { ...t.arrow, p0: { x: toImg.x, y: toImg.y } }
+      } else if (arrowInteraction.value.handle === 'p1') {
+        t.arrow = { ...t.arrow, p1: { x: toImg.x, y: toImg.y } }
+      }
+      return
+    }
+  }
 
   if (interaction.value.mode === 'drawing') {
     const dx = x - interaction.value.startX
@@ -827,6 +971,7 @@ function onMouseMove(e) {
 
 function onMouseUp() {
   interaction.value = { mode: 'idle', startX: 0, startY: 0, baseRect: null, handle: '' }
+  arrowInteraction.value = { mode: 'idle', startX: 0, startY: 0, moving: false, handle: '' }
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
 }
@@ -874,6 +1019,22 @@ const shapeOptions = [
   { value: 'rect', text: 'Retângulo' },
   { value: 'circle', text: 'Círculo' },
   { value: 'ellipse', text: 'Elipse' }
+]
+
+// Locate options
+const locateModes = [
+  { value: 'fixed', text: 'fixed' },
+  { value: 'adaptive', text: 'adaptive' }
+]
+const locatePolarities = [
+  { value: 'any', text: 'any' },
+  { value: 'dark_to_light', text: 'dark_to_light' },
+  { value: 'light_to_dark', text: 'light_to_dark' }
+]
+const locateEdgeSelect = [
+  { value: 'strongest', text: 'strongest' },
+  { value: 'first', text: 'first' },
+  { value: 'closest_to_mid', text: 'closest_to_mid' }
 ]
 
 function normalizeROIForSave(roi) {
@@ -929,6 +1090,20 @@ function addTool(type) {
       polygon_max_points: 1000,
       inspec_pass_fail: true
     }
+  } else if (type === 'locate') {
+    tool = {
+      ...base,
+      ROI: roiFull,
+      threshold_mode: 'fixed',
+      threshold: 20,
+      adaptive_k: 1.0,
+      polaridade: 'any',
+      edge_select: 'strongest',
+      smooth_ksize: 5,
+      grad_kernel: 3,
+      apply_transform: false,
+      arrow: { p0: { x: 0.1 * roiFull.rect.w, y: 0.5 * roiFull.rect.h }, p1: { x: 0.9 * roiFull.rect.w, y: 0.5 * roiFull.rect.h } }
+    }
   } else {
     tool = { ...base, ROI: roiFull }
   }
@@ -979,6 +1154,25 @@ async function load() {
     form.value.description = data.description || ''
     selectedVmId.value = data.vm?.id ? String(data.vm.id) : ''
     toolsItems.value = Array.isArray(data.tools) ? data.tools.map(t => ({ ...t })) : []
+    // Garantir defaults para tipos específicos (evitar que v-model quebre)
+    toolsItems.value = toolsItems.value.map(t => {
+      const tt = String(t.type || '').toLowerCase()
+      if (tt === 'locate') {
+        if (!t.ROI) t.ROI = { shape: 'rect', rect: { x: 0, y: 0, w: resolutionWidth.value || 752, h: resolutionHeight.value || 480 } }
+        t.threshold_mode = t.threshold_mode || 'fixed'
+        t.threshold = (t.threshold != null ? t.threshold : (t.th_min != null ? t.th_min : 20))
+        t.adaptive_k = (t.adaptive_k != null ? t.adaptive_k : 1.0)
+        t.polaridade = t.polaridade || 'any'
+        t.edge_select = t.edge_select || 'strongest'
+        t.smooth_ksize = (t.smooth_ksize != null ? t.smooth_ksize : 5)
+        t.grad_kernel = (t.grad_kernel != null ? t.grad_kernel : 3)
+        t.apply_transform = !!t.apply_transform
+        if (!t.arrow || typeof t.arrow !== 'object') t.arrow = { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } }
+        if (!t.arrow.p0) t.arrow.p0 = { x: 0, y: 0 }
+        if (!t.arrow.p1) t.arrow.p1 = { x: 0, y: 0 }
+      }
+      return t
+    })
     // snapshot inicial das tools para detectar mudanças
     originalToolsSnapshot.value = snapshotTools(toolsItems.value)
     // Tentar carregar configs da VM associada
@@ -1019,7 +1213,7 @@ async function load() {
             interval_ms: Number(chosenTrg.interval_ms)||500
           }
         }
-      } catch (e) {
+      } catch {
         // silencioso: mantém defaults
       }
     }
@@ -1112,6 +1306,16 @@ async function save() {
         mode: t.mode,
         th_min: t.th_min,
         th_max: t.th_max,
+        // Locate params (se presentes)
+        threshold_mode: t.threshold_mode,
+        threshold: (t.threshold != null ? t.threshold : t.th_min),
+        adaptive_k: t.adaptive_k,
+        polaridade: t.polaridade,
+        edge_select: t.edge_select,
+        smooth_ksize: t.smooth_ksize,
+        grad_kernel: t.grad_kernel,
+        apply_transform: t.apply_transform,
+        arrow: t.arrow,
         kernel: t.kernel,
         open: t.open,
         close: t.close,
@@ -1161,6 +1365,16 @@ async function save() {
           mode: t.mode,
           th_min: t.th_min,
           th_max: t.th_max,
+          // Locate params (se presentes)
+          threshold_mode: t.threshold_mode,
+          threshold: (t.threshold != null ? t.threshold : t.th_min),
+          adaptive_k: t.adaptive_k,
+          polaridade: t.polaridade,
+          edge_select: t.edge_select,
+          smooth_ksize: t.smooth_ksize,
+          grad_kernel: t.grad_kernel,
+          apply_transform: t.apply_transform,
+          arrow: t.arrow,
           kernel: t.kernel,
           open: t.open,
           close: t.close,
@@ -1258,6 +1472,16 @@ async function updateVM() {
       mode: t.mode,
       th_min: t.th_min,
       th_max: t.th_max,
+      // Locate params (se presentes)
+      threshold_mode: t.threshold_mode,
+      threshold: (t.threshold != null ? t.threshold : t.th_min),
+      adaptive_k: t.adaptive_k,
+      polaridade: t.polaridade,
+      edge_select: t.edge_select,
+      smooth_ksize: t.smooth_ksize,
+      grad_kernel: t.grad_kernel,
+      apply_transform: t.apply_transform,
+      arrow: t.arrow,
       kernel: t.kernel,
       open: t.open,
       close: t.close,

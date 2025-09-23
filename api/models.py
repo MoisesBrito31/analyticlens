@@ -208,6 +208,7 @@ class InspectionTool(models.Model):
         ('threshold', 'Threshold'),
         ('morphology', 'Morphology'),
         ('blob', 'Blob'),
+        ('locate', 'Locate'),
         ('math', 'Math'),
     ]
 
@@ -310,6 +311,24 @@ class BlobToolConfig(models.Model):
     )
     approx_epsilon_ratio = models.FloatField(default=0.01, validators=[MinValueValidator(0.0)])
     polygon_max_points = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+
+
+class LocateToolConfig(models.Model):
+    tool = models.OneToOneField(InspectionTool, on_delete=models.CASCADE, related_name='locate')
+    # seta (coordenadas globais)
+    arrow_p0_x = models.FloatField(default=0.0)
+    arrow_p0_y = models.FloatField(default=0.0)
+    arrow_p1_x = models.FloatField(default=0.0)
+    arrow_p1_y = models.FloatField(default=0.0)
+    # parâmetros
+    threshold_mode = models.CharField(max_length=20, default='fixed')  # 'fixed' | 'adaptive'
+    threshold = models.FloatField(default=20.0)
+    adaptive_k = models.FloatField(default=1.0)
+    polaridade = models.CharField(max_length=20, default='any')  # 'dark_to_light'|'light_to_dark'|'any'
+    edge_select = models.CharField(max_length=30, default='strongest')  # 'first'|'strongest'|'closest_to_mid'
+    smooth_ksize = models.IntegerField(default=5, validators=[MinValueValidator(1)])
+    grad_kernel = models.IntegerField(default=3, validators=[MinValueValidator(1)])
+    apply_transform = models.BooleanField(default=False)
 
 
 class MathTool(models.Model):

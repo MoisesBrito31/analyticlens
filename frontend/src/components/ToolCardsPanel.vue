@@ -39,6 +39,7 @@
           <button type="button" class="am-btn" @click="pickType('threshold')">Threshold</button>
           <button type="button" class="am-btn" @click="pickType('morphology')">Morphology</button>
           <button type="button" class="am-btn" @click="pickType('math')">Math</button>
+          <button type="button" class="am-btn" @click="pickType('locate')">Locate</button>
         </div>
         <div class="am-footer">
           <button type="button" class="am-close" @click="closeAdd">Fechar</button>
@@ -140,6 +141,17 @@ function pickType(type) {
   if (type === 'threshold') Object.assign(base, { mode: 'binary', th_min: 0, th_max: 255 })
   if (type === 'morphology') Object.assign(base, { kernel: 3, open: 0, close: 0, shape: 'ellipse' })
   if (type === 'math') Object.assign(base, { operation: '', reference_tool_id: null, custom_formula: '' })
+  if (type === 'locate') Object.assign(base, {
+    threshold_mode: 'fixed',
+    threshold: 20,
+    adaptive_k: 1.0,
+    polaridade: 'any',
+    edge_select: 'strongest',
+    smooth_ksize: 5,
+    grad_kernel: 3,
+    apply_transform: false,
+    arrow: { p0: { x: 10, y: 50 }, p1: { x: 90, y: 50 } }
+  })
   emit('add-tool', base)
   closeAdd()
 }

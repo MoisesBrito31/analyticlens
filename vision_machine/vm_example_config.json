@@ -7,181 +7,117 @@
   "inspection_config": {
     "tools": [
       {
+        "order_index": 0,
+        "name": "filtro_cinza",
+        "type": "grayscale",
         "ROI": {
-          "h": 480,
-          "w": 752,
-          "x": 0,
-          "y": 0
+          "shape": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 752,
+            "h": 480
+          }
         },
-        "id": 1,
-        "method": "luminance",
-        "name": "grayscale_filter",
-        "normalize": false,
-        "type": "grayscale"
-      },
-      {
-        "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
-        },
-        "id": 11,
-        "type": "blur",
-        "name": "gaussian_blur",
-        "method": "gaussian",
-        "ksize": 5,
-        "sigma": 0.8,
-        "inspec_pass_fail": false
-      },
-      {
-        "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
-        },
-        "id": 12,
-        "type": "threshold",
-        "name": "range_threshold",
-        "mode": "range",
-        "th_min": 130,
-        "th_max": 255,
-        "inspec_pass_fail": false
-      },
-      {
-        "ROI": {
-          "x": 0,
-          "y": 0,
-          "w": 752,
-          "h": 480
-        },
-        "id": 13,
-        "type": "morphology",
-        "name": "morph_smooth",
-        "kernel": 3,
-        "open": 1,
-        "close": 1,
-        "shape": "ellipse",
-        "inspec_pass_fail": false
-      },
-      {
-        "ROI": {
-          "h": 300,
-          "w": 300,
-          "x": 0,
-          "y": 10
-        },
-        "area_max": 1000,
-        "area_min": 100,
-        "blob_count_test": false,
-        "id": 2,
-        "inspec_pass_fail": true,
-        "name": "blob_1",
-        "test_blob_count_max": 5,
-        "test_blob_count_min": 4,
-        "test_total_area_max": 600,
-        "test_total_area_min": 50,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
-        "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
-      },
-      {
-        "ROI": {
-          "h": 300,
-          "w": 300,
-          "x": 0,
-          "y": 10
-        },
-        "area_max": 1000,
-        "area_min": 100,
-        "blob_count_test": false,
-        "id": 3,
         "inspec_pass_fail": false,
+        "method": "luminance",
+        "normalize": false
+      },
+      {
+        "order_index": 1,
+        "name": "locate_1",
+        "type": "locate",
+        "ROI": {
+          "shape": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 752,
+            "h": 480
+          }
+        },
+        "inspec_pass_fail": false,
+        "arrow": {
+          "p0": { "x": 170, "y": 230 },
+          "p1": { "x": 580, "y": 230 }
+        },
+        "threshold_mode": "fixed",
+        "threshold": 20,
+        "adaptive_k": 1.0,
+        "polaridade": "any",
+        "max_edges": 1,
+        "edge_select": "strongest",
+        "smooth_ksize": 5,
+        "grad_kernel": 3,
+        "apply_transform": false
+      },
+      {
+        "order_index": 2,
         "name": "blob_2",
-        "test_blob_count_max": 5,
-        "test_blob_count_min": 4,
-        "test_total_area_max": 2000,
-        "test_total_area_min": 600,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
         "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
-      },
-      {
         "ROI": {
-          "h": 300,
-          "w": 300,
-          "x": 0,
-          "y": 10
+          "shape": "rect",
+          "rect": {
+            "x": 85.75561476969925,
+            "y": 9.095292475574126,
+            "w": 594.3941124222814,
+            "h": 452.76741530262655
+          }
         },
-        "area_max": 1000,
-        "area_min": 100,
-        "blob_count_test": true,
-        "id": 4,
         "inspec_pass_fail": true,
-        "name": "blob_3",
-        "test_blob_count_max": 10000,
-        "test_blob_count_min": 1,
-        "test_total_area_max": 600,
-        "test_total_area_min": 50,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
-        "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
-      },
-      {
-        "ROI": {
-          "h": 480,
-          "w": 752,
-          "x": 0,
-          "y": 0
-        },
-        "area_max": 10000000,
-        "area_min": 100,
+        "th_min": 200,
+        "th_max": 230,
+        "area_min": 0,
+        "area_max": 3000000,
+        "total_area_test": false,
         "blob_count_test": true,
-        "id": 5,
-        "inspec_pass_fail": true,
-        "name": "blob_4",
-        "test_blob_count_max": 10000,
+        "test_total_area_min": 0,
+        "test_total_area_max": 1000,
         "test_blob_count_min": 1,
-        "test_total_area_max": 10000,
-        "test_total_area_min": 50,
-        "th_max": 255,
-        "th_min": 130,
-        "total_area_test": true,
-        "type": "blob",
-        "contour_chain": "TC89_KCOS",
-        "approx_epsilon_ratio": 0.003,
-        "polygon_max_points": 1000
+        "test_blob_count_max": 1,
+        "contour_chain": "SIMPLE",
+        "approx_epsilon_ratio": 0.03,
+        "polygon_max_points": 10000
       }
-    ]
+    ],
+    "source_config": {
+      "type": "pasta",
+      "folder_path": "./test_theshold",
+      "fps": 30,
+      "resolution": [
+        752,
+        480
+      ]
+    },
+    "trigger_config": {
+      "type": "continuous",
+      "interval_ms": 500
+    }
   },
   "source_config": {
     "type": "pasta",
-    "camera_id": 0,
+    "camera_id": 999,
     "resolution": [
       752,
       480
     ],
     "fps": 30,
-    "folder_path": "./test_images",
+    "folder_path": "./test_theshold",
     "rtsp_url": ""
   },
   "trigger_config": {
     "type": "continuous",
-    "interval_ms": 2000
+    "interval_ms": 500
+  },
+  "logging": {
+    "enabled": true,
+    "mode": "keep_last",
+    "max_logs": 20,
+    "policy": "ALL",
+    "batch_size": 2,
+    "batch_ms": 200
   },
   "error_msg": "",
-  "last_saved": "2025-08-23T19:55:33.573668"
+  "websocket_update_RUN_mode": 1.0,
+  "last_saved": "2025-09-23T15:39:32.507149"
 }

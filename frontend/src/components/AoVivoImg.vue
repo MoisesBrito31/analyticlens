@@ -22,9 +22,14 @@
                 :contour-paths="contourPaths"
                 :has-contours="hasContours"
                 :analysis-colors="analysisColors"
+                :show-locate-arrow="showLocateArrow"
+                :locate-arrow="locateArrowPx"
+                :show-locate-edges="showLocateEdges"
+                :locate-edges="locateEdgesPx"
                 :editable="isEditingEnabled"
                 :roi-shape="selectedRoiShape"
                 @roi-change="onRoiChange"
+                @locate-arrow-change="onLocateArrowChange"
               />
             </div>
           </template>
@@ -129,6 +134,10 @@
               <button type="button" class="toggle-btn" :class="{ active: showBlobCentroids }" @click="toggleBlobCentroids">Blobs: centróides</button>
               <button type="button" class="toggle-btn" :class="{ active: showBlobBoxes }" @click="toggleBlobBoxes">Blobs: áreas</button>
               <button type="button" class="toggle-btn" :class="{ active: showBlobContours }" @click="toggleBlobContours">Blobs: contornos</button>
+            </div>
+            <div class="analysis-toolbar mb-2" v-if="selectedItem && (selectedItem.tool_type === 'locate' || selectedItem.type === 'locate')">
+              <button type="button" class="toggle-btn" :class="{ active: showLocateArrow }" @click="toggleLocateArrow">Locate: seta ROI</button>
+              <button type="button" class="toggle-btn" :class="{ active: showLocateEdges }" @click="toggleLocateEdges">Locate: bordas</button>
             </div>
             <!-- Tabela de blobs: centroide e área -->
             <div v-if="selectedItem && (selectedItem.tool_type === 'blob' || selectedItem.type === 'blob')" class="mb-2">
@@ -552,6 +561,29 @@ function buildInspectionPayload(overrides = {}) {
       base.operation = String(getVal(it, def, 'operation', ''))
       base.reference_tool_id = getVal(it, def, 'reference_tool_id', null)
       base.custom_formula = String(getVal(it, def, 'custom_formula', ''))
+    } else if (type === 'locate') {
+      base.threshold_mode = String(getVal(it, def, 'threshold_mode', 'fixed'))
+      // manter compatibilidade com th_min legado
+      const thr = getVal(it, def, 'threshold', getVal(it, def, 'th_min', 20))
+      base.threshold = Number(thr)
+      base.adaptive_k = Number(getVal(it, def, 'adaptive_k', 1.0))
+      base.polaridade = String(getVal(it, def, 'polaridade', 'any'))
+      base.edge_select = String(getVal(it, def, 'edge_select', 'strongest'))
+      base.smooth_ksize = Number(getVal(it, def, 'smooth_ksize', 5))
+      base.grad_kernel = Number(getVal(it, def, 'grad_kernel', 3))
+      base.apply_transform = !!getVal(it, def, 'apply_transform', false)
+      // arrow
+      let arrow = getVal(it, def, 'arrow', null)
+      if (arrow && typeof arrow === 'object' && arrow.p0 && arrow.p1) {
+        base.arrow = {
+          p0: { x: Number(arrow.p0.x || 0), y: Number(arrow.p0.y || 0) },
+          p1: { x: Number(arrow.p1.x || 0), y: Number(arrow.p1.y || 0) }
+        }
+      } else {
+        // fallback: derive da ROI
+        const r = extractRoi(it) || extractRoi(def)
+        if (r) base.arrow = { p0: { x: r.x + r.w * 0.1, y: r.y + r.h * 0.5 }, p1: { x: r.x + r.w * 0.9, y: r.y + r.h * 0.5 } }
+      }
     }
     return base
   })
@@ -720,7 +752,7 @@ const analysisEntries = computed(() => {
   if (!it || typeof it !== 'object') return []
   const exclude = new Set([
     'tool_id','tool_name','tool_type','status','image_modified','processing_time_ms',
-    'pass_fail','error','ROI','roi','rect','bbox','test_results','tests','test','blobs'
+    'pass_fail','error','ROI','roi','rect','bbox','test_results','tests','test','blobs','edges','primary_point','primary_angle_deg','arrow'
   ])
   const preferredOrder = ['blob_count', 'total_area', 'roi_area']
   const added = new Set()
@@ -1020,6 +1052,12 @@ const isBlobSelected = computed(() => {
   return t === 'blob'
 })
 
+const isLocateSelected = computed(() => {
+  const it = selectedItem.value
+  const t = String(it?.tool_type || it?.type || '').toLowerCase()
+  return t === 'locate'
+})
+
 // opções de blob agora definidas no ToolParamsPanel
 
 const blobParams = ref({
@@ -1062,6 +1100,7 @@ watch(selectedItem, () => {
   }
 }, { immediate: true })
 
+
 function toNumber(v, def = 0, allowFloat = false) {
   const n = allowFloat ? parseFloat(v) : parseInt(v)
   return Number.isFinite(n) ? n : def
@@ -1083,6 +1122,27 @@ const { getParam, selectedToolType } = useToolParams(selectedItem, selectedDef)
 const activeParams = computed(() => {
   const t = selectedToolType.value
   if (t === 'blob') return blobParams.value
+  if (t === 'locate') return {
+    threshold_mode: String(getParam('threshold_mode', 'fixed')),
+    threshold: toFloat(getParam('threshold', getParam('th_min', 20))),
+    adaptive_k: toFloat(getParam('adaptive_k', 1.0)),
+    polaridade: String(getParam('polaridade', 'any')),
+    edge_select: String(getParam('edge_select', 'strongest')),
+    smooth_ksize: toNumber(getParam('smooth_ksize', 5)),
+    grad_kernel: toNumber(getParam('grad_kernel', 3)),
+    apply_transform: !!getParam('apply_transform', false),
+    arrow: (() => {
+      const it = selectedItem.value || {}
+      const def = selectedDef.value || {}
+      const src = { ...def, ...it }
+      const ar = (src.arrow && typeof src.arrow === 'object') ? src.arrow : null
+      if (ar && ar.p0 && ar.p1) return { p0: { x: toFloat(ar.p0.x, 0), y: toFloat(ar.p0.y, 0) }, p1: { x: toFloat(ar.p1.x, 0), y: toFloat(ar.p1.y, 0) } }
+      // fallback: derive from ROI rect
+      const r = extractRoi(src)
+      if (r) return { p0: { x: r.x + r.w * 0.1, y: r.y + r.h * 0.5 }, p1: { x: r.x + r.w * 0.9, y: r.y + r.h * 0.5 } }
+      return { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } }
+    })()
+  }
   if (t === 'grayscale') return {
     method: getParam('method', 'luminance'),
     normalize: !!getParam('normalize', false)
@@ -1143,6 +1203,20 @@ function onParamsUpdate({ key, value }) {
   } else {
     emitParam(key, value)
   }
+
+  // Enviar configuração completa para garantir aplicação online na VM para qualquer parâmetro
+  try {
+    if (selectedIndex.value >= 0) {
+      // Clona lista e aplica override localmente
+      const cloned = Array.isArray(displayItems.value) ? displayItems.value.map(it => ({ ...(it || {}) })) : []
+      if (cloned[selectedIndex.value]) {
+        cloned[selectedIndex.value][key] = value
+      }
+      const full = buildInspectionPayload({ toolsOrdered: cloned })
+      try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
+      emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
+    }
+  } catch {}
 }
 
 // seleção de tipo agora via selectedToolType
@@ -1178,6 +1252,56 @@ function onRoiChange(newShape) {
   }
 }
 
+function onLocateArrowChange(newArrow) {
+  if (props.readOnly) return
+  if (selectedIndex.value < 0) return
+  // Atualiza imediatamente a visualização
+  // Não alteramos selectedRoi pois é independente do arrow
+  emitParam('arrow', {
+    p0: { x: Number(newArrow?.p0?.x) || 0, y: Number(newArrow?.p0?.y) || 0 },
+    p1: { x: Number(newArrow?.p1?.x) || 0, y: Number(newArrow?.p1?.y) || 0 }
+  })
+
+  // E também envia a configuração completa para aplicação online
+  try {
+    const cloned = Array.isArray(displayItems.value) ? displayItems.value.map(it => ({ ...(it || {}) })) : []
+    if (cloned[selectedIndex.value]) {
+      cloned[selectedIndex.value].arrow = {
+        p0: { x: Number(newArrow?.p0?.x) || 0, y: Number(newArrow?.p0?.y) || 0 },
+        p1: { x: Number(newArrow?.p1?.x) || 0, y: Number(newArrow?.p1?.y) || 0 }
+      }
+    }
+    const full = buildInspectionPayload({ toolsOrdered: cloned })
+    try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
+    emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
+  } catch {}
+}
+
+// ----- Locate overlays -----
+const showLocateArrow = ref(false)
+const showLocateEdges = ref(true)
+function toggleLocateArrow() { showLocateArrow.value = !showLocateArrow.value }
+function toggleLocateEdges() { showLocateEdges.value = !showLocateEdges.value }
+
+const locateArrowPx = computed(() => {
+  if (!isLocateSelected.value) return null
+  const it = selectedItem.value || {}
+  const ar = it.arrow && typeof it.arrow === 'object' ? it.arrow : null
+  if (ar && ar.p0 && ar.p1) return { p0: { x: Number(ar.p0.x)||0, y: Number(ar.p0.y)||0 }, p1: { x: Number(ar.p1.x)||0, y: Number(ar.p1.y)||0 } }
+  // Fallback do ROI
+  const r = extractRoi(it) || effectiveRoiRect.value
+  if (r) return { p0: { x: r.x + r.w * 0.1, y: r.y + r.h * 0.5 }, p1: { x: r.x + r.w * 0.9, y: r.y + r.h * 0.5 } }
+  return null
+})
+
+const locateEdgesPx = computed(() => {
+  if (!isLocateSelected.value) return []
+  const it = selectedItem.value || {}
+  const edges = Array.isArray(it.edges) ? it.edges : []
+  if (!edges.length) return []
+  return edges.map(e => ({ x: Number(e.x)||0, y: Number(e.y)||0, angle_deg: Number(e.angle_deg)||0, strength: Number(e.strength)||0 }))
+})
+
 function onAddTool(newTool) {
   // Encaminha para a view hospedeira adicionar no final
   // Nesta emissão, index: -1 para indicar operação na lista e key: 'ADD_TOOL'
@@ -1189,6 +1313,14 @@ function onReorderExternal({ orderIndexes, deleteIndexes, composePlan }) {
   if (!Array.isArray(orderIndexes)) return
   // Emite para a view hospedeira a nova ordem e exclusões pendentes
   emit('update-tool-param', { index: -1, key: 'INSPECTION_REORDER', value: { orderIndexes, deleteIndexes: Array.isArray(deleteIndexes) ? deleteIndexes : [], composePlan: Array.isArray(composePlan) ? composePlan : [] } })
+}
+
+function onDeleteTool(payload) {
+  if (props.readOnly) return
+  // Aceita índice numérico ou objeto { index }
+  const idx = typeof payload === 'number' ? payload : (payload?.index ?? -1)
+  if (idx < 0) return
+  emit('update-tool-param', { index: -1, key: 'INSPECTION_REORDER', value: { orderIndexes: [], deleteIndexes: [idx], composePlan: [] } })
 }
 </script>
 

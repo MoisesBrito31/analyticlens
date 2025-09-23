@@ -19,7 +19,7 @@ from rest_framework import status
 # Local imports
 from .models import (
     VirtualMachine, Inspection, InspectionTool, ToolKind,
-    GrayscaleTool, BlurTool, ThresholdTool, MorphologyTool, BlobToolConfig, MathTool,
+    GrayscaleTool, BlurTool, ThresholdTool, MorphologyTool, BlobToolConfig, LocateToolConfig, MathTool,
     InspectionResult
 )
 from .serializers import (
@@ -954,6 +954,32 @@ class SaveInspection(APIView):
                         approx_epsilon_ratio=float(t.get('approx_epsilon_ratio', 0.01) or 0.01),
                         polygon_max_points=int(t.get('polygon_max_points', 0) or 0)
                     )
+                elif t_type == 'locate':
+                    # Normalizar seta (arrow) do payload (pode vir em ROI.arrow ou tool.arrow)
+                    arrow = {}
+                    try:
+                        arrow = (t.get('arrow') or {})
+                        if not arrow and isinstance(t_roi, dict):
+                            arrow = (t_roi.get('arrow') or {})
+                    except Exception:
+                        arrow = {}
+                    p0 = arrow.get('p0') or {}
+                    p1 = arrow.get('p1') or {}
+                    LocateToolConfig.objects.create(
+                        tool=tool,
+                        arrow_p0_x=float(p0.get('x', 0.0) or 0.0),
+                        arrow_p0_y=float(p0.get('y', 0.0) or 0.0),
+                        arrow_p1_x=float(p1.get('x', 0.0) or 0.0),
+                        arrow_p1_y=float(p1.get('y', 0.0) or 0.0),
+                        threshold_mode=str(t.get('threshold_mode') or 'fixed'),
+                        threshold=float(t.get('threshold', t.get('th_min', 20.0)) or 20.0),
+                        adaptive_k=float(t.get('adaptive_k', 1.0) or 1.0),
+                        polaridade=str(t.get('polaridade') or 'any'),
+                        edge_select=str(t.get('edge_select') or 'strongest'),
+                        smooth_ksize=int(t.get('smooth_ksize', 5) or 5),
+                        grad_kernel=int(t.get('grad_kernel', 3) or 3),
+                        apply_transform=bool(t.get('apply_transform', False)),
+                    )
                 elif t_type == 'math':
                     # MathTool referencia outra tool (por id) se possível
                     ref_name = t.get('reference_tool_name') or None
@@ -1095,6 +1121,21 @@ class InspectionDetail(APIView):
                     'contour_chain': t.blob.contour_chain,
                     'approx_epsilon_ratio': t.blob.approx_epsilon_ratio,
                     'polygon_max_points': t.blob.polygon_max_points,
+                })
+            elif t.type == 'locate' and hasattr(t, 'locate') and t.locate:
+                td.update({
+                    'arrow': {
+                        'p0': {'x': t.locate.arrow_p0_x, 'y': t.locate.arrow_p0_y},
+                        'p1': {'x': t.locate.arrow_p1_x, 'y': t.locate.arrow_p1_y},
+                    },
+                    'threshold_mode': t.locate.threshold_mode,
+                    'threshold': t.locate.threshold,
+                    'adaptive_k': t.locate.adaptive_k,
+                    'polaridade': t.locate.polaridade,
+                    'edge_select': t.locate.edge_select,
+                    'smooth_ksize': t.locate.smooth_ksize,
+                    'grad_kernel': t.locate.grad_kernel,
+                    'apply_transform': t.locate.apply_transform,
                 })
             elif t.type == 'math' and hasattr(t, 'math') and t.math:
                 td.update({
@@ -1245,6 +1286,32 @@ class InspectionDetail(APIView):
                             contour_chain=str(t.get('contour_chain') or 'SIMPLE'),
                             approx_epsilon_ratio=float(t.get('approx_epsilon_ratio', 0.01) or 0.01),
                             polygon_max_points=int(t.get('polygon_max_points', 0) or 0)
+                        )
+                    elif t_type == 'locate':
+                        # Normalizar seta (arrow) do payload (pode vir em ROI.arrow ou tool.arrow)
+                        arrow = {}
+                        try:
+                            arrow = (t.get('arrow') or {})
+                            if not arrow and isinstance(t_roi, dict):
+                                arrow = (t_roi.get('arrow') or {})
+                        except Exception:
+                            arrow = {}
+                        p0 = arrow.get('p0') or {}
+                        p1 = arrow.get('p1') or {}
+                        LocateToolConfig.objects.create(
+                            tool=tool,
+                            arrow_p0_x=float(p0.get('x', 0.0) or 0.0),
+                            arrow_p0_y=float(p0.get('y', 0.0) or 0.0),
+                            arrow_p1_x=float(p1.get('x', 0.0) or 0.0),
+                            arrow_p1_y=float(p1.get('y', 0.0) or 0.0),
+                            threshold_mode=str(t.get('threshold_mode') or 'fixed'),
+                            threshold=float(t.get('threshold', t.get('th_min', 20.0)) or 20.0),
+                            adaptive_k=float(t.get('adaptive_k', 1.0) or 1.0),
+                            polaridade=str(t.get('polaridade') or 'any'),
+                            edge_select=str(t.get('edge_select') or 'strongest'),
+                            smooth_ksize=int(t.get('smooth_ksize', 5) or 5),
+                            grad_kernel=int(t.get('grad_kernel', 3) or 3),
+                            apply_transform=bool(t.get('apply_transform', False)),
                         )
                     elif t_type == 'math':
                         # Tenta resolver referência pela ordem/nome já criados

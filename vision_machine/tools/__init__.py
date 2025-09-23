@@ -8,6 +8,7 @@ from .math_tool import MathTool
 from .blur_filter_tool import BlurFilterTool
 from .threshold_filter_tool import ThresholdFilterTool
 from .morphology_filter_tool import MorphologyFilterTool
+from .locate_tool import LocateTool
 
 __all__ = [
     'BaseTool',
@@ -16,5 +17,6 @@ __all__ = [
     'MathTool',
     'BlurFilterTool',
     'ThresholdFilterTool',
-    'MorphologyFilterTool'
+    'MorphologyFilterTool',
+    'LocateTool'
 ]

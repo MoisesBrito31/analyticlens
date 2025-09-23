@@ -69,6 +69,33 @@
         <path :d="path" fill-rule="evenodd" :fill="analysisColors.fillContour" :stroke="analysisColors.strokeMed" stroke-width="1.0" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" shape-rendering="geometricPrecision" />
       </template>
     </g>
+
+    <!-- Locate: seta ROI -->
+    <g v-if="showLocateArrow && locateArrow">
+      <line :x1="locateArrow.p0.x" :y1="locateArrow.p0.y" :x2="locateArrow.p1.x" :y2="locateArrow.p1.y"
+        :stroke="analysisColors.strokeStrong" stroke-width="2" vector-effect="non-scaling-stroke"
+        :pointer-events="editable ? 'all' : 'none'" @mousedown.stop.prevent="editable ? onArrowDown($event) : null" />
+      <!-- Cabeça da seta -->
+      <g>
+        <line :x1="locateArrow.p1.x" :y1="locateArrow.p1.y" :x2="locateArrow.p1.x - arrowHead.dx1" :y2="locateArrow.p1.y - arrowHead.dy1" :stroke="analysisColors.strokeStrong" stroke-width="2" vector-effect="non-scaling-stroke" />
+        <line :x1="locateArrow.p1.x" :y1="locateArrow.p1.y" :x2="locateArrow.p1.x - arrowHead.dx2" :y2="locateArrow.p1.y - arrowHead.dy2" :stroke="analysisColors.strokeStrong" stroke-width="2" vector-effect="non-scaling-stroke" />
+      </g>
+      <!-- Handles de edição -->
+      <template v-if="editable">
+        <circle :cx="locateArrow.p0.x" :cy="locateArrow.p0.y" :r="handleSize/2" fill="#0d6efd" opacity="0.9" pointer-events="all" @mousedown.stop.prevent="onArrowHandleDown($event, 'p0')" />
+        <circle :cx="locateArrow.p1.x" :cy="locateArrow.p1.y" :r="handleSize/2" fill="#0d6efd" opacity="0.9" pointer-events="all" @mousedown.stop.prevent="onArrowHandleDown($event, 'p1')" />
+      </template>
+    </g>
+
+    <!-- Locate: bordas detectadas -->
+    <g v-if="showLocateEdges && Array.isArray(locateEdges) && locateEdges.length">
+      <g v-for="(e, i) in locateEdges" :key="`le_${i}`">
+        <circle :cx="e.x" :cy="e.y" r="3" :fill="analysisColors.strokeMed" />
+        <!-- Traço curto indicando ângulo da borda -->
+        <line :x1="e.x" :y1="e.y" :x2="e.x + 12 * Math.cos((e.angle_deg||0) * Math.PI/180)" :y2="e.y + 12 * Math.sin((e.angle_deg||0) * Math.PI/180)"
+          :stroke="analysisColors.strokeMed" stroke-width="2" vector-effect="non-scaling-stroke" />
+      </g>
+    </g>
   </svg>
 </template>
 
@@ -97,13 +124,65 @@ const props = defineProps({
   // Controle de sensibilidade e snapping
   dragGain: { type: Number, default: 1 },
   snapToGrid: { type: Boolean, default: false },
-  gridStep: { type: Number, default: 1 }
+  gridStep: { type: Number, default: 1 },
+  // Locate
+  showLocateArrow: { type: Boolean, default: false },
+  locateArrow: { type: Object, default: null }, // { p0:{x,y}, p1:{x,y} } em coordenadas de imagem
+  showLocateEdges: { type: Boolean, default: false },
+  locateEdges: { type: Array, default: () => [] } // [{x,y,angle_deg,strength}]
 })
 
-const emit = defineEmits(['roi-change'])
+const emit = defineEmits(['roi-change', 'locate-arrow-change'])
 
 const svgEl = ref(null)
 const handleSize = 8
+
+const arrowHead = computed(() => {
+  // Vetor da seta para desenhar cabeça
+  const a = props.locateArrow
+  if (!a || !a.p0 || !a.p1) return { dx1: 0, dy1: 0, dx2: 0, dy2: 0 }
+  const vx = (a.p1.x - a.p0.x)
+  const vy = (a.p1.y - a.p0.y)
+  const len = Math.hypot(vx, vy) || 1
+  const ux = vx / len
+  const uy = vy / len
+  // Rotaciona para criar duas asas
+  const size = Math.min(12, len * 0.2)
+  const ax = -ux
+  const ay = -uy
+  // rot ±30°
+  const cos = Math.cos(Math.PI / 6)
+  const sin = Math.sin(Math.PI / 6)
+  const dx1 = size * (ax * cos - ay * sin)
+  const dy1 = size * (ax * sin + ay * cos)
+  const dx2 = size * (ax * cos + ay * sin)
+  const dy2 = size * (-ax * sin + ay * cos)
+  return { dx1, dy1, dx2, dy2 }
+})
+
+function clampPoint(vb, x, y) {
+  const nx = Math.max(vb.minX, Math.min(x, vb.minX + vb.w))
+  const ny = Math.max(vb.minY, Math.min(y, vb.minY + vb.h))
+  return { x: nx, y: ny }
+}
+
+function onArrowDown(evt) {
+  const p = clientToSvg(evt)
+  const mod = evt.shiftKey ? 0.25 : 1
+  const base = { p0: { ...(props.locateArrow?.p0 || { x: 0, y: 0 }) }, p1: { ...(props.locateArrow?.p1 || { x: 0, y: 0 }) } }
+  drag.value = { active: true, mode: 'arrow-move', startX: p.x, startY: p.y, init: { arrow: base }, current: { arrow: base }, modGain: mod }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
+
+function onArrowHandleDown(evt, which) {
+  const p = clientToSvg(evt)
+  const mod = evt.shiftKey ? 0.25 : 1
+  const base = { p0: { ...(props.locateArrow?.p0 || { x: 0, y: 0 }) }, p1: { ...(props.locateArrow?.p1 || { x: 0, y: 0 }) } }
+  drag.value = { active: true, mode: `arrow-${which}`, startX: p.x, startY: p.y, init: { arrow: base }, current: { arrow: base }, modGain: mod }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+}
 
 function parseViewBox(vbStr) {
   const parts = String(vbStr || '').trim().split(/\s+/).map(parseFloat)
@@ -305,6 +384,23 @@ function onMouseMove(evt) {
     }
     drag.value.current = { ...(drag.value.current || {}), ellipse: e }
   }
+  else if (mode.startsWith('arrow')) {
+    const vb = parseViewBox(props.viewBox)
+    const a0 = drag.value.init.arrow
+    let a = { p0: { ...a0.p0 }, p1: { ...a0.p1 } }
+    if (mode === 'arrow-move') {
+      a.p0.x = a0.p0.x + dx; a.p0.y = a0.p0.y + dy
+      a.p1.x = a0.p1.x + dx; a.p1.y = a0.p1.y + dy
+    } else if (mode === 'arrow-p0') {
+      a.p0.x = a0.p0.x + dx; a.p0.y = a0.p0.y + dy
+    } else if (mode === 'arrow-p1') {
+      a.p1.x = a0.p1.x + dx; a.p1.y = a0.p1.y + dy
+    }
+    const c0 = clampPoint(vb, a.p0.x, a.p0.y)
+    const c1 = clampPoint(vb, a.p1.x, a.p1.y)
+    a = { p0: c0, p1: c1 }
+    drag.value.current = { ...(drag.value.current || {}), arrow: a }
+  }
 }
 
 function onMouseUp() {
@@ -324,6 +420,9 @@ function onMouseUp() {
   } else if (mode.startsWith('ellipse') && (current?.ellipse || init?.ellipse)) {
     const e = current?.ellipse || init?.ellipse
     emit('roi-change', { shape: 'ellipse', ellipse: { ...e } })
+  } else if (mode.startsWith('arrow') && (current?.arrow || init?.arrow)) {
+    const a = current?.arrow || init?.arrow
+    emit('locate-arrow-change', { p0: { ...a.p0 }, p1: { ...a.p1 } })
   }
   drag.value.current = null
 }
