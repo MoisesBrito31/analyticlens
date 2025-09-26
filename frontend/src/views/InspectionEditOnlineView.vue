@@ -334,6 +334,8 @@ function connectWebSocket() {
               smooth_ksize: t.smooth_ksize,
               grad_kernel: t.grad_kernel,
               apply_transform: t.apply_transform,
+              rotate: !!t.rotate,
+              reference: t.reference,
               arrow: t.arrow
             }))
             vmConfigApplied.value = true
@@ -533,6 +535,8 @@ async function applyToVM() {
         smooth_ksize: t.smooth_ksize,
         grad_kernel: t.grad_kernel,
         apply_transform: t.apply_transform,
+        rotate: t.rotate,
+        reference: t.reference,
         arrow: t.arrow,
         kernel: t.kernel,
         open: t.open,

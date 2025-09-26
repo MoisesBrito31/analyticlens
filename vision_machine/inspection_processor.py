@@ -87,6 +87,18 @@ class InspectionProcessor:
             
             try:
                 # Extrair ROI (retorna também bbox/máscara através de atributos internos do tool)
+                # Antes de extrair ROI, calcule offset acumulado de ferramentas anteriores com apply_transform=true
+                try:
+                    tx = self._compute_cumulative_offset(i)
+                    if tx:
+                        setattr(tool, '_transform_offset', tx)
+                    else:
+                        if hasattr(tool, '_transform_offset'):
+                            delattr(tool, '_transform_offset')
+                        # Sem offset: garantir ROI original
+                        # (não altera tool.roi)
+                except Exception:
+                    pass
                 roi_image = tool.extract_roi(current_image)
                 
                 # Verificar se já temos uma imagem processada do tipo necessário
@@ -117,12 +129,43 @@ class InspectionProcessor:
                         'pass_fail': None,
                         'processing_time_ms': getattr(tool, 'last_processing_time', 0)
                     }
+                    # Injetar ROI efetivo usado (após transform)
+                    try:
+                        x, y, w, h = getattr(tool, '_last_roi_bbox', (None, None, None, None))
+                        if all(v is not None for v in (x, y, w, h)) and w > 0 and h > 0:
+                            result['ROI'] = { 'shape': 'rect', 'rect': { 'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h) } }
+                        rd = getattr(tool, '_last_roi_debug', None)
+                        if isinstance(rd, dict):
+                            result['debug'] = result.get('debug') or {}
+                            result['debug']['roi_debug'] = rd
+                    except Exception:
+                        pass
                     
                 else:
                     # Ferramentas de análise/math geram resultados
                     result = tool.process(current_image, roi_image, self.results)
                     result['status'] = 'success'
                     result['image_modified'] = False
+                    # Injetar ROI efetivo usado (após transform)
+                    try:
+                        x, y, w, h = getattr(tool, '_last_roi_bbox', (None, None, None, None))
+                        if all(v is not None for v in (x, y, w, h)) and w > 0 and h > 0:
+                            result['ROI'] = { 'shape': 'rect', 'rect': { 'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h) } }
+                    except Exception:
+                        pass
+                    # Injeta debug do offset aplicado ao ROI se houver
+                    try:
+                        applied = getattr(tool, '_last_applied_offset', None)
+                        result['debug'] = result.get('debug') or {}
+                        result['debug']['roi_transform'] = {
+                            'applied': bool(applied is not None),
+                            'offset': applied if isinstance(applied, dict) else None
+                        }
+                        rd = getattr(tool, '_last_roi_debug', None)
+                        if isinstance(rd, dict):
+                            result['debug']['roi_debug'] = rd
+                    except Exception:
+                        pass
                 
                 # Armazenar resultado por chave estável (fallback para índice quando não houver ID)
                 result_key = tool.id if tool.id is not None else f"idx_{i}"
@@ -149,6 +192,91 @@ class InspectionProcessor:
         
         # Resultado final da inspeção
         return self._generate_final_result(current_image, total_processing_time)
+
+    def _apply_offset_to_roi_copy(self, roi_obj, tx):
+        import copy
+        roi = copy.deepcopy(roi_obj) if isinstance(roi_obj, dict) else {}
+        if not isinstance(tx, dict):
+            return roi
+        dx = float(tx.get('dx', 0.0) or 0.0)
+        dy = float(tx.get('dy', 0.0) or 0.0)
+        dth = float(tx.get('dtheta_deg', 0.0) or 0.0)
+        rotate = bool(tx.get('rotate', False))
+        shape = roi.get('shape')
+        if shape == 'rect' or (not shape and all(k in roi for k in ('x','y','w','h'))):
+            r = roi.get('rect', roi)
+            r['x'] = int(round(float(r.get('x', 0)) + dx))
+            r['y'] = int(round(float(r.get('y', 0)) + dy))
+            if 'rect' in roi:
+                roi['rect'] = r
+            else:
+                roi.update(r)
+            if 'shape' not in roi:
+                roi['shape'] = 'rect'
+        elif shape == 'circle' and isinstance(roi.get('circle'), dict):
+            c = roi['circle']
+            c['cx'] = int(round(float(c.get('cx', 0)) + dx))
+            c['cy'] = int(round(float(c.get('cy', 0)) + dy))
+        elif shape == 'ellipse' and isinstance(roi.get('ellipse'), dict):
+            e = roi['ellipse']
+            e['cx'] = int(round(float(e.get('cx', 0)) + dx))
+            e['cy'] = int(round(float(e.get('cy', 0)) + dy))
+            if rotate:
+                e['angle'] = float(e.get('angle', 0.0)) + dth
+        return roi
+
+    def _compute_cumulative_offset(self, upto_index: int):
+        """Computa offset cumulativo (dx, dy, dtheta) até a ferramenta anterior com apply_transform=true.
+        Regra: usa o resultado da última ferramenta com tool_type == 'locate' e apply_transform==true
+        que tenha offset no resultado. Não compõe múltiplas; aplica somente a última.
+        """
+        try:
+            # percorrer resultados anteriores do fim para o início
+            for j in range(upto_index - 1, -1, -1):
+                tool_j = self.tools[j]
+                res_key = tool_j.id if tool_j.id is not None else f"idx_{j}"
+                res = self.results.get(res_key)
+                if not isinstance(res, dict):
+                    continue
+                # apply_transform pode vir na definição (tool.config) ou no result (eco)
+                apply_tx = bool(getattr(tool_j, 'apply_transform', False))
+                if 'apply_transform' in res:
+                    try:
+                        apply_tx = bool(res.get('apply_transform'))
+                    except Exception:
+                        pass
+                if not apply_tx:
+                    continue
+                # localizar offset do padrão novo; se ausente, tentar derivar de reference/result
+                off = res.get('offset') if isinstance(res.get('offset'), dict) else None
+                ref = res.get('reference') if isinstance(res.get('reference'), dict) else None
+                cur = res.get('result') if isinstance(res.get('result'), dict) else None
+                dx = dy = dth = 0.0
+                rot = bool(res.get('rotate', False))
+                if off:
+                    dx = float(off.get('x', 0.0) or 0.0)
+                    dy = float(off.get('y', 0.0) or 0.0)
+                    dth = float(off.get('angle_deg', 0.0) or 0.0)
+                elif ref and cur:
+                    try:
+                        dx = float(cur.get('x', 0.0)) - float(ref.get('x', 0.0))
+                        dy = float(cur.get('y', 0.0)) - float(ref.get('y', 0.0))
+                        ca = float(cur.get('angle_deg', cur.get('angle', 0.0) or 0.0))
+                        ra = float(ref.get('angle_deg', ref.get('angle', 0.0) or 0.0))
+                        dth = float(ca - ra)
+                    except Exception:
+                        dx = dy = dth = 0.0
+                else:
+                    continue
+                return {
+                    'dx': float(dx),
+                    'dy': float(dy),
+                    'dtheta_deg': float(dth),
+                    'rotate': rot
+                }
+        except Exception:
+            return None
+        return None
     
     def _apply_roi_result(self, original_image: np.ndarray, roi_result: np.ndarray, bbox, mask) -> np.ndarray:
         """Aplica o resultado do ROI de volta à imagem original respeitando máscara (para circle/ellipse)."""

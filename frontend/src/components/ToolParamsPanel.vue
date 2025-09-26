@@ -42,8 +42,8 @@
         v-if="activeComp"
         :params="params"
         :read-only="readOnly"
+  @change="onChange"
         v-bind="extraProps"
-        @change="onChange"
       />
       <template v-else>
         <div class="text-muted small mb-2">Parâmetros desta ferramenta são somente leitura aqui.</div>

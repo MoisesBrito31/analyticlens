@@ -55,6 +55,15 @@
         <FormKit type="checkbox" :label="'Aplicar transformação (dx, dy, θ) nos ROIs seguintes'" :disabled="readOnly"
           :model-value="!!params.apply_transform" @input="v=>emitChange('apply_transform', !!v)" />
       </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <FormKit type="checkbox" :label="'rotate'" :disabled="readOnly"
+          :model-value="!!params.rotate" @input="v=>emitChange('rotate', !!v)" />
+      </div>
+      <div class="col-12 col-md-4 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100" type="button" :disabled="readOnly" @click="onSyncReference">
+          Definir referência (usar resultado atual)
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -123,6 +132,11 @@ function onThresholdInput(v) {
   const nv = toNum(v, localThreshold.value)
   localThreshold.value = nv
   emitChange('threshold', nv)
+}
+
+function onSyncReference() {
+  // Sinaliza ao host para sincronizar a referência com o resultado atual
+  emitChange('reference', '__SYNC_REFERENCE__')
 }
 </script>
 

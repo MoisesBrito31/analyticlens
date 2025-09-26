@@ -21,6 +21,8 @@ class LocateTool(BaseTool):
       - edge_select: 'first' | 'strongest' | 'closest_to_mid' (padrão 'strongest')
       - smooth_ksize: int (ímpar, padrão 5) suavização 1D do perfil
       - grad_kernel: int (1,3,5; padrão 3) janela para Sobel no cálculo de ângulo 2D
+      - reference: { x: float, y: float, angle | angle_deg: float }  (opcional)
+      - rotate: bool (opcional; se true, offset inclui rotação; senão mantém ângulo da referência)
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -33,6 +35,18 @@ class LocateTool(BaseTool):
         self.edge_select = str(config.get('edge_select', 'strongest')).lower()
         self.smooth_ksize = int(config.get('smooth_ksize', 5))
         self.grad_kernel = int(config.get('grad_kernel', 3))
+        # Echo de apply_transform no result (valor de config)
+        try:
+            self.apply_transform = bool(config.get('apply_transform', False))
+        except Exception:
+            self.apply_transform = False
+        # Referência opcional para cálculo de offset (x, y, angle_deg)
+        self.reference = self._parse_reference(config.get('reference'))
+        # Controle de rotação no offset
+        try:
+            self.rotate = bool(config.get('rotate', False))
+        except Exception:
+            self.rotate = False
 
     def process(self, image: np.ndarray, roi_image: np.ndarray,
                 previous_results: Dict[int, Dict] = None) -> Dict[str, Any]:
@@ -121,10 +135,36 @@ class LocateTool(BaseTool):
                     't': float(idx) / max(1.0, float(len(intens_s) - 1))
                 })
 
-            # Escolha primária
+            # Escolha primária (resultado atual)
             primary = edges[0] if edges else None
 
             processing_time = (time.time() - start_time) * 1000.0
+            # Preparar seções padronizadas
+            reference_out = None
+            offset_out = None
+            result_out = None
+
+            if primary is not None:
+                result_out = {
+                    'x': float(primary['x']),
+                    'y': float(primary['y']),
+                    'angle_deg': float(primary['angle_deg'])
+                }
+                if self.reference is not None:
+                    reference_out = {
+                        'x': float(self.reference['x']),
+                        'y': float(self.reference['y']),
+                        'angle_deg': float(self.reference['angle_deg'])
+                    }
+                    dx = float(result_out['x']) - float(reference_out['x'])
+                    dy = float(result_out['y']) - float(reference_out['y'])
+                    dA = self._normalize_angle(float(result_out['angle_deg']) - float(reference_out['angle_deg']))
+                    offset_out = {
+                        'x': float(dx),
+                        'y': float(dy),
+                        'angle_deg': float(dA) if bool(self.rotate) else float(reference_out['angle_deg'])
+                    }
+
             return {
                 'tool_id': self.id,
                 'tool_name': self.name,
@@ -132,19 +172,18 @@ class LocateTool(BaseTool):
                 'processing_time_ms': processing_time,
                 'edges': edges,
                 'edge_count': len(edges),
+                # Compatibilidade anterior
                 'primary_point': {'x': primary['x'], 'y': primary['y']} if primary else None,
                 'primary_angle_deg': primary['angle_deg'] if primary else None,
+                # Novos blocos padronizados
+                'reference': reference_out,
+                'result': result_out,
+                'offset': offset_out,
+                'rotate': bool(self.rotate),
+                'apply_transform': bool(self.apply_transform),
                 'arrow': {
                     'p0': {'x': float(p0_g[0]), 'y': float(p0_g[1])},
                     'p1': {'x': float(p1_g[0]), 'y': float(p1_g[1])}
-                },
-                'debug': {
-                    'threshold_used': float(th),
-                    'max_abs_grad': float(max_grad),
-                    'samples': int(len(intens_s)),
-                    'level_T': float(level_T),
-                    'level_crossings': int(len(lvl_peaks)),
-                    'grad_peaks': int(len(grad_peaks))
                 },
                 'pass_fail': None if not self.inspec_pass_fail else True
             }
@@ -307,5 +346,24 @@ class LocateTool(BaseTool):
         while a > 180.0:
             a -= 360.0
         return a
+
+    def _parse_reference(self, ref_like: Any) -> Dict[str, float] | None:
+        try:
+            if not isinstance(ref_like, dict):
+                return None
+            x = float(ref_like.get('x')) if ref_like.get('x') is not None else None
+            y = float(ref_like.get('y')) if ref_like.get('y') is not None else None
+            # aceitar 'angle' ou 'angle_deg'
+            ang_raw = ref_like.get('angle_deg')
+            if ang_raw is None:
+                ang_raw = ref_like.get('angle')
+            ang = float(ang_raw) if ang_raw is not None else None
+            if x is None or y is None or ang is None:
+                return None
+            # normalizar ângulo para [-180, 180]
+            ang = self._normalize_angle(float(ang))
+            return {'x': x, 'y': y, 'angle_deg': ang}
+        except Exception:
+            return None
 
 

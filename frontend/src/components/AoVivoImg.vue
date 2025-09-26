@@ -26,7 +26,7 @@
                 :locate-arrow="locateArrowPx"
                 :show-locate-edges="showLocateEdges"
                 :locate-edges="locateEdgesPx"
-                :editable="isEditingEnabled"
+                :editable="isEditingEnabled && roiEditEnabled"
                 :roi-shape="selectedRoiShape"
                 @roi-change="onRoiChange"
                 @locate-arrow-change="onLocateArrowChange"
@@ -63,7 +63,16 @@
           <MetricsPanel :metrics="metrics" />
         </div>
         <div class="tool-details mt-3" v-if="selectedItem">
-          <div class="tools-header">Configuração/Resultados da Tool</div>
+          <div class="tools-header d-flex align-items-center justify-content-between">
+            <div>Configuração/Resultados da Tool</div>
+            <div class="d-flex align-items-center gap-2">
+              <label class="switch small mb-0" title="Habilita edição manual do ROI no overlay">
+                <input type="checkbox" v-model="roiEditEnabled" :disabled="props.readOnly" />
+                <span class="slider"></span>
+              </label>
+              <span class="small text-muted">Edição ROI</span>
+            </div>
+          </div>
           <div class="tool-form">
             <div class="tabs">
               <button type="button" class="tab-btn" :class="{ active: activeTab === 'tests' }" @click="activeTab = 'tests'">Testes</button>
@@ -139,6 +148,68 @@
               <button type="button" class="toggle-btn" :class="{ active: showLocateArrow }" @click="toggleLocateArrow">Locate: seta ROI</button>
               <button type="button" class="toggle-btn" :class="{ active: showLocateEdges }" @click="toggleLocateEdges">Locate: bordas</button>
             </div>
+            <!-- Painel de Locate aprimorado -->
+            <div v-if="selectedItem && (selectedItem.tool_type === 'locate' || selectedItem.type === 'locate')" class="mb-2">
+              <h6 class="section-subtitle">Locate</h6>
+              <div class="card-like">
+                <div class="row g-3">
+                  <div class="col-12 col-lg-4">
+                    <div class="small text-muted mb-1">Reference</div>
+                    <table class="blob-table compact">
+                      <tbody>
+                        <tr><td>x</td><td>{{ formatNumber(selectedItem?.reference?.x) }}</td></tr>
+                        <tr><td>y</td><td>{{ formatNumber(selectedItem?.reference?.y) }}</td></tr>
+                        <tr><td>angle_deg</td><td>{{ formatNumber(selectedItem?.reference?.angle_deg ?? selectedItem?.reference?.angle) }}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="col-12 col-lg-4">
+                    <div class="small text-muted mb-1">Result</div>
+                    <table class="blob-table compact">
+                      <tbody>
+                        <tr><td>x</td><td>{{ formatNumber(selectedItem?.result?.x ?? selectedItem?.primary_point?.x) }}</td></tr>
+                        <tr><td>y</td><td>{{ formatNumber(selectedItem?.result?.y ?? selectedItem?.primary_point?.y) }}</td></tr>
+                        <tr><td>angle_deg</td><td>{{ formatNumber(selectedItem?.result?.angle_deg ?? selectedItem?.primary_angle_deg) }}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="col-12 col-lg-4">
+                    <div class="small text-muted mb-1">Offset</div>
+                    <table class="blob-table compact">
+                      <tbody>
+                        <tr><td>x</td><td>{{ formatNumber(selectedItem?.offset?.x) }}</td></tr>
+                        <tr><td>y</td><td>{{ formatNumber(selectedItem?.offset?.y) }}</td></tr>
+                        <tr><td>angle_deg</td><td>{{ formatNumber(selectedItem?.offset?.angle_deg) }}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="mt-3" v-if="locateEdgesPx && locateEdgesPx.length">
+                  <div class="small text-muted mb-1">Edges ({{ locateEdgesPx.length }})</div>
+                  <table class="blob-table compact">
+                    <thead>
+                      <tr>
+                        <th style="width:60px">#</th>
+                        <th>x</th>
+                        <th>y</th>
+                        <th>angle_deg</th>
+                        <th>strength</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(e,i) in locateEdgesPx.slice(0,10)" :key="`le_${i}`">
+                        <td>{{ i+1 }}</td>
+                        <td>{{ formatNumber(e.x) }}</td>
+                        <td>{{ formatNumber(e.y) }}</td>
+                        <td>{{ formatNumber(e.angle_deg) }}</td>
+                        <td>{{ formatNumber(e.strength) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
             <!-- Tabela de blobs: centroide e área -->
             <div v-if="selectedItem && (selectedItem.tool_type === 'blob' || selectedItem.type === 'blob')" class="mb-2">
               <h6 class="section-subtitle">Blobs</h6>
@@ -162,7 +233,7 @@
                 </table>
               </div>
             </div>
-            <FormKit type="form" :actions="false" disabled>
+            <FormKit v-if="!(selectedItem && (selectedItem.tool_type === 'locate' || selectedItem.type === 'locate'))" type="form" :actions="false" disabled>
               <div class="form-section">
                 <div v-if="analysisEntries.length === 0" class="text-muted small">Sem dados de análise.</div>
                 <div class="row g-2" v-else>
@@ -250,6 +321,7 @@ const emit = defineEmits(['select', 'update-tool-param', 'update-inspection-conf
 const imageUrl = ref('')
 let objectUrl = ''
 const selectedIndex = ref(-1)
+const roiEditEnabled = ref(false)
 const selectedRoi = ref(null)
 const selectedRoiShape = ref(null)
 const hasAutoSelected = ref(false)
@@ -362,6 +434,51 @@ watch([() => props.tools, () => props.results], () => {
   const recv = { tools: props.tools || [], results: props.results || [] }
   try { lastReceivedJson.value = JSON.stringify(recv, null, 2) } catch { lastReceivedJson.value = String(recv) }
 }, { immediate: true })
+
+// Sempre que resultados mudarem, se a tool selecionada tiver ROI no result, atualizar overlay
+watch([() => props.results, selectedIndex, roiEditEnabled], () => {
+  try {
+    // Se edição manual estiver ativa, manter ROI configurado da tool, sem correção
+    if (roiEditEnabled.value) {
+      const src = Array.isArray(props.tools) && props.tools.length ? props.tools : []
+      const idx = selectedIndex.value
+      if (idx >= 0 && idx < src.length) {
+        const base = src[idx]
+        const s = extractRoiShape(base)
+        if (s) {
+          if (s.shape === 'rect' && s.rect) {
+            selectedRoi.value = { ...s.rect }
+            selectedRoiShape.value = { shape: 'rect', rect: { ...s.rect } }
+          } else if (s.shape === 'circle' && s.circle) {
+            selectedRoi.value = null
+            selectedRoiShape.value = { shape: 'circle', circle: { ...s.circle } }
+          } else if (s.shape === 'ellipse' && s.ellipse) {
+            selectedRoi.value = null
+            selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...s.ellipse } }
+          }
+        }
+      }
+      return
+    }
+
+    const items = displayItems.value || []
+    const idx = selectedIndex.value
+    if (idx < 0 || idx >= items.length) return
+    const it = items[idx]
+    const s = extractRoiShape(it)
+    if (!s) return
+    if (s.shape === 'rect' && s.rect) {
+      selectedRoi.value = { ...s.rect }
+      selectedRoiShape.value = { shape: 'rect', rect: { ...s.rect } }
+    } else if (s.shape === 'circle' && s.circle) {
+      selectedRoi.value = null
+      selectedRoiShape.value = { shape: 'circle', circle: { ...s.circle } }
+    } else if (s.shape === 'ellipse' && s.ellipse) {
+      selectedRoi.value = null
+      selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...s.ellipse } }
+    }
+  } catch {}
+}, { deep: true })
 
 onBeforeUnmount(() => {
   revokeObjectUrl()
@@ -1201,6 +1318,11 @@ function onParamsUpdate({ key, value }) {
   if (selectedToolType.value === 'blob') {
     updateBlobParam(key, value)
   } else {
+    // Suporte ao botão Sync da LocateParams: reference = "__SYNC_REFERENCE__"
+    if (selectedToolType.value === 'locate' && key === 'reference' && value === '__SYNC_REFERENCE__') {
+      setLocateReference()
+      return
+    }
     emitParam(key, value)
   }
 
@@ -1216,6 +1338,37 @@ function onParamsUpdate({ key, value }) {
       try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
       emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
     }
+  } catch {}
+}
+
+// Define a referência (reference) da Locate com base no resultado atual
+function setLocateReference() {
+  if (props.readOnly) return
+  if (selectedIndex.value < 0) return
+  const it = selectedItem.value || {}
+  // Buscar no props.results a entrada correspondente pela id/nome
+  const id = it?.tool_id ?? it?.id
+  const name = it?.tool_name ?? it?.name
+  let resIt = null
+  try {
+    const list = Array.isArray(props.results) ? props.results : []
+    resIt = list.find(r => (id != null && r?.tool_id === id) || (name && (r?.tool_name === name || r?.name === name))) || null
+  } catch {}
+  const cur = (resIt && typeof resIt.result === 'object') ? resIt.result : null
+  const x = cur ? Number(cur.x) : Number(it?.primary_point?.x)
+  const y = cur ? Number(cur.y) : Number(it?.primary_point?.y)
+  const ang = cur ? Number(cur.angle_deg) : Number(it?.primary_angle_deg)
+  if (![x, y, ang].every(Number.isFinite)) return
+  const val = { x, y, angle_deg: ang }
+  // Emite atualização direta do param
+  emit('update-tool-param', { index: selectedIndex.value, key: 'reference', value: val })
+  // E envia configuração completa para aplicação online
+  try {
+    const cloned = Array.isArray(displayItems.value) ? displayItems.value.map(it => ({ ...(it || {}) })) : []
+    if (cloned[selectedIndex.value]) cloned[selectedIndex.value].reference = val
+    const full = buildInspectionPayload({ toolsOrdered: cloned })
+    try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
+    emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
   } catch {}
 }
 
@@ -1261,6 +1414,18 @@ function onLocateArrowChange(newArrow) {
     p0: { x: Number(newArrow?.p0?.x) || 0, y: Number(newArrow?.p0?.y) || 0 },
     p1: { x: Number(newArrow?.p1?.x) || 0, y: Number(newArrow?.p1?.y) || 0 }
   })
+  // Override local
+  try {
+    const it = selectedItem.value || {}
+    const key = it?.tool_id ?? it?.id ?? selectedIndex.value
+    localArrowOverride.value = {
+      ...localArrowOverride.value,
+      [key]: {
+        p0: { x: Number(newArrow?.p0?.x) || 0, y: Number(newArrow?.p0?.y) || 0 },
+        p1: { x: Number(newArrow?.p1?.x) || 0, y: Number(newArrow?.p1?.y) || 0 }
+      }
+    }
+  } catch {}
 
   // E também envia a configuração completa para aplicação online
   try {
@@ -1283,9 +1448,17 @@ const showLocateEdges = ref(true)
 function toggleLocateArrow() { showLocateArrow.value = !showLocateArrow.value }
 function toggleLocateEdges() { showLocateEdges.value = !showLocateEdges.value }
 
+// Override local para refletir edição imediata da seta até que tools/results retornem
+const localArrowOverride = ref({})
+
 const locateArrowPx = computed(() => {
   if (!isLocateSelected.value) return null
   const it = selectedItem.value || {}
+  const key = it?.tool_id ?? it?.id ?? selectedIndex.value
+  const o = localArrowOverride.value[key]
+  if (o && o.p0 && o.p1) {
+    return { p0: { x: Number(o.p0.x)||0, y: Number(o.p0.y)||0 }, p1: { x: Number(o.p1.x)||0, y: Number(o.p1.y)||0 } }
+  }
   const ar = it.arrow && typeof it.arrow === 'object' ? it.arrow : null
   if (ar && ar.p0 && ar.p1) return { p0: { x: Number(ar.p0.x)||0, y: Number(ar.p0.y)||0 }, p1: { x: Number(ar.p1.x)||0, y: Number(ar.p1.y)||0 } }
   // Fallback do ROI

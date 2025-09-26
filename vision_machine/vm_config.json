@@ -21,76 +21,82 @@
         },
         "inspec_pass_fail": false,
         "method": "luminance",
-        "normalize": false
+        "normalize": false,
+        "rotate": false
       },
       {
         "order_index": 1,
+        "name": "locate_3",
+        "type": "locate",
+        "ROI": {
+          "shape": "rect",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 749,
+            "h": 476
+          }
+        },
+        "inspec_pass_fail": false,
+        "threshold_mode": "fixed",
+        "threshold": 140,
+        "adaptive_k": 1,
+        "polaridade": "dark_to_light",
+        "edge_select": "first",
+        "smooth_ksize": 5,
+        "grad_kernel": 3,
+        "apply_transform": true,
+        "rotate": false,
+        "reference": {
+          "x": 373.522216796875,
+          "y": 32.57450866699219,
+          "angle_deg": 180
+        },
+        "arrow": {
+          "p0": {
+            "x": 372.51237152645604,
+            "y": 15.56782134246923
+          },
+          "p1": {
+            "x": 374.55272173582034,
+            "y": 453.44118766653975
+          }
+        }
+      },
+      {
+        "order_index": 2,
         "name": "blob_2",
         "type": "blob",
         "ROI": {
           "shape": "rect",
           "rect": {
-            "x": 244,
-            "y": 142,
-            "w": 276,
-            "h": 201
+            "x": 277.1328511610202,
+            "y": 41.95178276868421,
+            "w": 203.88732394366195,
+            "h": 192.55437127268112
           }
         },
         "inspec_pass_fail": true,
-        "th_min": 200,
-        "th_max": 230,
+        "th_min": 0,
+        "th_max": 20,
         "threshold": 200,
+        "rotate": false,
         "area_min": 0,
         "area_max": 3000000,
         "total_area_test": false,
         "blob_count_test": true,
         "test_total_area_min": 0,
         "test_total_area_max": 1000,
-        "test_blob_count_min": 1,
-        "test_blob_count_max": 1,
+        "test_blob_count_min": 0,
+        "test_blob_count_max": 0,
         "contour_chain": "SIMPLE",
         "approx_epsilon_ratio": 0.03,
         "polygon_max_points": 10000
-      },
-      {
-        "order_index": 2,
-        "name": "locate_3",
-        "type": "locate",
-        "ROI": {
-          "shape": "rect",
-          "rect": {
-            "x": 47,
-            "y": 31,
-            "w": 632,
-            "h": 431
-          }
-        },
-        "inspec_pass_fail": false,
-        "threshold_mode": "fixed",
-        "threshold": 20,
-        "adaptive_k": 1,
-        "polaridade": "dark_to_light",
-        "edge_select": "closest_to_mid",
-        "smooth_ksize": 5,
-        "grad_kernel": 3,
-        "apply_transform": false,
-        "arrow": {
-          "p0": {
-            "x": 103,
-            "y": 247
-          },
-          "p1": {
-            "x": 635,
-            "y": 254
-          }
-        }
       }
     ],
     "source_config": {
       "type": "pasta",
-      "camera_id": 0,
-      "folder_path": "./test_theshold",
-      "rtsp_url": "",
+      "folder_path": "./test_locate_nv1",
       "fps": 30,
       "resolution": [
         752,
@@ -99,7 +105,7 @@
     },
     "trigger_config": {
       "type": "continuous",
-      "interval_ms": 500
+      "interval_ms": 200
     }
   },
   "source_config": {
@@ -110,12 +116,12 @@
       480
     ],
     "fps": 30,
-    "folder_path": "./test_theshold",
+    "folder_path": "./test_locate_nv1",
     "rtsp_url": ""
   },
   "trigger_config": {
     "type": "continuous",
-    "interval_ms": 500
+    "interval_ms": 200
   },
   "logging": {
     "enabled": true,
@@ -127,5 +133,5 @@
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-23T22:21:52.631430"
+  "last_saved": "2025-09-26T16:29:03.224736"
 }
