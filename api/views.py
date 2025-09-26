@@ -979,6 +979,10 @@ class SaveInspection(APIView):
                         smooth_ksize=int(t.get('smooth_ksize', 5) or 5),
                         grad_kernel=int(t.get('grad_kernel', 3) or 3),
                         apply_transform=bool(t.get('apply_transform', False)),
+                        rotate=bool(t.get('rotate', False)),
+                        reference_x=(float((t.get('reference') or {}).get('x')) if isinstance(t.get('reference'), dict) and (t.get('reference').get('x') is not None) else None),
+                        reference_y=(float((t.get('reference') or {}).get('y')) if isinstance(t.get('reference'), dict) and (t.get('reference').get('y') is not None) else None),
+                        reference_A=(float((t.get('reference') or {}).get('angle_deg') if isinstance(t.get('reference'), dict) and (t.get('reference').get('angle_deg') is not None) else (t.get('reference') or {}).get('angle')) if isinstance(t.get('reference'), dict) and ((t.get('reference').get('angle_deg') is not None) or (t.get('reference').get('angle') is not None)) else None),
                     )
                 elif t_type == 'math':
                     # MathTool referencia outra tool (por id) se possível
@@ -1136,6 +1140,8 @@ class InspectionDetail(APIView):
                     'smooth_ksize': t.locate.smooth_ksize,
                     'grad_kernel': t.locate.grad_kernel,
                     'apply_transform': t.locate.apply_transform,
+                    'rotate': t.locate.rotate,
+                    'reference': ({'x': t.locate.reference_x, 'y': t.locate.reference_y, 'angle_deg': t.locate.reference_A} if (t.locate.reference_x is not None and t.locate.reference_y is not None and t.locate.reference_A is not None) else None),
                 })
             elif t.type == 'math' and hasattr(t, 'math') and t.math:
                 td.update({
@@ -1312,6 +1318,10 @@ class InspectionDetail(APIView):
                             smooth_ksize=int(t.get('smooth_ksize', 5) or 5),
                             grad_kernel=int(t.get('grad_kernel', 3) or 3),
                             apply_transform=bool(t.get('apply_transform', False)),
+                            rotate=bool(t.get('rotate', False)),
+                            reference_x=(float((t.get('reference') or {}).get('x')) if isinstance(t.get('reference'), dict) and (t.get('reference').get('x') is not None) else None),
+                            reference_y=(float((t.get('reference') or {}).get('y')) if isinstance(t.get('reference'), dict) and (t.get('reference').get('y') is not None) else None),
+                            reference_A=(float((t.get('reference') or {}).get('angle_deg') if isinstance(t.get('reference'), dict) and (t.get('reference').get('angle_deg') is not None) else (t.get('reference') or {}).get('angle')) if isinstance(t.get('reference'), dict) and ((t.get('reference').get('angle_deg') is not None) or (t.get('reference').get('angle') is not None)) else None),
                         )
                     elif t_type == 'math':
                         # Tenta resolver referência pela ordem/nome já criados

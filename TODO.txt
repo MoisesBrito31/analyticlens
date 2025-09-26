@@ -183,42 +183,42 @@ Mapa de Dependências e Hierarquia (FE ↔ Orquestrador ↔ VM ↔ QA/Docs)
     - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
       - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
 
-- (VM 15) [ ] Tool Locate
-  - (VM 15.1) [ ] Especificação final: localizar borda (mudança de contraste) ao longo de uma seta (ROI), retornando ponto (x, y), ângulo (θ), polaridade detectada, score/confiança; suportar múltiplas bordas (lista) ou apenas a primeira/mais forte
-  - (VM 15.2) [ ] Schema de configuração (vm_config.json):
+- (VM 15) [>] Tool Locate
+  - (VM 15.1) [X] Especificação final: localizar borda (mudança de contraste) ao longo de uma seta (ROI), retornando ponto (x, y), ângulo (θ), polaridade detectada, score/confiança; suportar múltiplas bordas (lista) ou apenas a primeira/mais forte
+  - (VM 15.2) [X] Schema de configuração (vm_config.json):
         tipo: "locate"; ROI: seta com `p0{x,y}`, `p1{x,y}` e sentido; 
-        threshold_mode: "fixed"|"adaptive"; th_min, th_max; 
+        threshold_mode: "fixed"|"adaptive"; threshold; 
         polaridade: "dark_to_light"|"light_to_dark"|"any"; 
         max_edges (int, default 1), edge_select: "first"|"strongest"|"closest_to_mid"; 
         apply_transform (bool) para realocação de ferramentas subsequentes (default false);
         smooth_ksize, grad_kernel, canny_{low,high} (opcional)
-  - (VM 15.3) [ ] Algoritmo de detecção:
+  - (VM 15.3) [X] Algoritmo de detecção:
         amostrar ao longo da seta; para cada amostra, varrer pequena janela perpendicular para robustez; 
         calcular gradiente 1D (Sobel/derivada) e detectar picos conforme polaridade; 
         subpixel com refinamento (interpolação do pico); coletar até max_edges e ordenar por score
-  - (VM 15.4) [ ] Cálculo de transformação: a partir do ponto e ângulo, derivar (dx, dy, θ) e publicar para o pipeline
-  - (VM 15.5) [ ] Propagação: aplicar (dx, dy, θ) aos ROIs das ferramentas com order_index maior; respeitar coord. globais/locais
-  - (VM 15.6) [ ] Overlays/Debug: desenhar seta-ROI, pontos encontrados, normais/ângulo e setas de deslocamento; logs [LOCATE]
-  - (VM 15.7) [ ] Testes: casos sintéticos (translação/rotação/ruído); polaridades; múltiplas bordas; bordas fracas; métricas (erro px/°)
+  - (VM 15.4) [X] Cálculo de transformação: a partir do ponto e ângulo, derivar (dx, dy, θ) e publicar para o pipeline
+  - (VM 15.5) [X] Propagação: aplicar (dx, dy, θ) aos ROIs das ferramentas com order_index maior; respeitar coord. globais/locais
+  - (VM 15.6) [X] Overlays/Debug: desenhar seta-ROI, pontos encontrados, normais/ângulo e setas de deslocamento; logs [LOCATE]
+  - (VM 15.7) [X] Testes: casos sintéticos (translação/rotação/ruído); polaridades; múltiplas bordas; bordas fracas; métricas (erro px/°)
   - (VM 15.8) [ ] Performance: benchmarks; limitar amostragem por passo/resolução; early-exit; otimizações em CPU alvo
-  - (VM 15.9) [ ] Integração Orquestrador/FE: UI para desenhar/editar seta e parâmetros; validações; visualização de overlay
-  - (VM 15.10) [ ] Documentação: parâmetros, presets e troubleshooting
-  - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
-    - (BE 14.1) [ ] Serializer/Schema: validar Tool Locate (arrow.p0/p1, threshold_mode, th_min, th_max, adaptive_k, polaridade, max_edges, edge_select, smooth_ksize, grad_kernel, apply_transform)
-    - (BE 14.2) [ ] Endpoint PUT /api/inspection_config: aceitar/update da Tool Locate; resposta com eco do schema normalizado
-    - (BE 14.3) [ ] Protocolo VM: enviar via comandos update_inspection_config/config_tool; idempotência e logs de debug (URL/payload/resposta)
-    - (BE 14.4) [ ] Endpoint preview opcional: POST /api/vms/{id}/tools/{tool_id}/preview (retorna edges, primary_point, primary_angle_deg)
-    - (BE 14.5) [ ] Persistência/Auditoria: versionar alterações em ferramentas (histórico básico)
-    - (BE 14.6) [ ] Ingestão de resultados: preservar `edges`/`primary_point`/`primary_angle_deg` no InspectionResult.result_json
-    - (BE 14.7) [ ] Testes: unitários (schema) e integração (PUT/preview) com mocks da VM
-    - (FE 7) [ ] Frontend: UI/overlays específicos; validações de entrada
-      - (FE 7.1) [ ] Desenhar/editar seta (2 cliques + drag), direção e binding para arrow.p0/p1
-      - (FE 7.2) [ ] Form de parâmetros: threshold_mode, th_min/th_max, adaptive_k, polaridade, max_edges, edge_select, smooth_ksize, grad_kernel, apply_transform
-      - (FE 7.3) [ ] Preview: chamar endpoint preview e renderizar edges/primary no overlay
-      - (FE 7.4) [ ] Persistir: salvar via PUT /api/inspection_config; feedback de validação/erro
-      - (FE 7.5) [ ] UX: indicar ROIs afetados quando apply_transform=true; tooltips/helps
+  - (VM 15.9) [X] Integração Orquestrador/FE: UI para desenhar/editar seta e parâmetros; validações; visualização de overlay
+  - (VM 15.10) [X] Documentação: parâmetros, presets e troubleshooting
+  - (BE 14) [X] Orquestrador (Django): compatibilidade de schema; endpoints de configuração
+    - (BE 14.1) [X] Serializer/Schema: validar Tool Locate (arrow.p0/p1, threshold_mode, th_min, th_max, adaptive_k, polaridade, max_edges, edge_select, smooth_ksize, grad_kernel, apply_transform)
+    - (BE 14.2) [x] Endpoint PUT /api/inspection_config: aceitar/update da Tool Locate; resposta com eco do schema normalizado
+    - (BE 14.3) [x] Protocolo VM: enviar via comandos update_inspection_config/config_tool; idempotência e logs de debug (URL/payload/resposta)
+    - (BE 14.4) [x] Endpoint preview opcional: POST /api/vms/{id}/tools/{tool_id}/preview (retorna edges, primary_point, primary_angle_deg)
+    - (BE 14.5) [x] Persistência/Auditoria: versionar alterações em ferramentas (histórico básico)
+    - (BE 14.6) [x] Ingestão de resultados: preservar `edges`/`primary_point`/`primary_angle_deg` no InspectionResult.result_json
+    - (BE 14.7) [X] Testes: unitários (schema) e integração (PUT/preview) com mocks da VM
+    - (FE 7) [x] Frontend: UI/overlays específicos; validações de entrada
+      - (FE 7.1) [x] Desenhar/editar seta (2 cliques + drag), direção e binding para arrow.p0/p1
+      - (FE 7.2) [x] Form de parâmetros: threshold_mode, th_min/th_max, adaptive_k, polaridade, max_edges, edge_select, smooth_ksize, grad_kernel, apply_transform
+      - (FE 7.3) [x] Preview: chamar endpoint preview e renderizar edges/primary no overlay
+      - (FE 7.4) [x] Persistir: salvar via PUT /api/inspection_config; feedback de validação/erro
+      - (FE 7.5) [x] UX: indicar ROIs afetados quando apply_transform=true; tooltips/helps
       - (QA 12) [ ] QA/Docs: fixtures de imagens, testes de precisão; documentação de uso
-      - (QA 12.1) [ ] Fixtures e testes de API (PUT/preview); snapshot de UI; guia de parâmetros e troubleshooting
+      - (QA 12.1) [x] Fixtures e testes de API (PUT/preview); snapshot de UI; guia de parâmetros e troubleshooting
 
 - (VM 16) [ ] Tool Blob Locate
   - (BE 14) [ ] Orquestrador (Django): compatibilidade de schema; endpoints de configuração

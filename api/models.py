@@ -329,6 +329,11 @@ class LocateToolConfig(models.Model):
     smooth_ksize = models.IntegerField(default=5, validators=[MinValueValidator(1)])
     grad_kernel = models.IntegerField(default=3, validators=[MinValueValidator(1)])
     apply_transform = models.BooleanField(default=False)
+    # novos parâmetros
+    rotate = models.BooleanField(default=False)
+    reference_x = models.FloatField(null=True, blank=True)
+    reference_y = models.FloatField(null=True, blank=True)
+    reference_A = models.FloatField(null=True, blank=True)  # graus
 
 
 class MathTool(models.Model):

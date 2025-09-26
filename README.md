@@ -23,11 +23,14 @@ O projeto inclui um sistema completo de ferramentas de visão computacional:
 
 - **GrayscaleTool**: Conversão para escala de cinza com múltiplos métodos
 - **BlobTool**: Detecção e análise de objetos em imagens
+- **LocateTool**: Localiza bordas ao longo de uma seta, calcula `reference`, `result` e `offset`, e (opcionalmente) realoca ROIs subsequentes (composição de múltiplas Locate suportada)
 - **MathTool**: Operações matemáticas sobre resultados de outras tools
 - **Pipeline Otimizado**: Cache de imagens e processamento sequencial
 - **API de Gerenciamento**: Comandos `config_tool` e `delete_tool` para controle dinâmico
 
 > 📖 **Para informações detalhadas sobre as tools, consulte o [TOOLS_README.md](vision_machine/TOOLS_README.md)**
+>
+> 📖 **Guia dedicado da Locate**: `vision_machine/tools/README_LocateTool.md`
 
 ### 📊 **Sistema de Logging e Resultados**
 Sistema completo para captura, armazenamento e análise de resultados de inspeção:
@@ -68,6 +71,12 @@ Sistema completo para captura, armazenamento e análise de resultados de inspeç
 - ESLint (qualidade de código)
 - fetch (HTTP) centralizado em um pequeno wrapper
 
+#### Destaques de UI (AoVivoImg)
+- Overlay SVG com edição de ROI (retângulo/círculo/elipse) e seta da Locate
+- Toggle “Edição ROI”: exibe configuração (sem offset) para editar; desligado, exibe ROI/arrow/edges efetivos (com offset)
+- Aba Análise (Locate): Reference / Result / Offset com duas casas decimais
+- Integração completa com VM: parâmetros de Locate (`rotate`, `reference`, `apply_transform`, `arrow`) aplicados em tempo real
+
 ### Backend
 
 - Django (framework web, ORM, autenticação)
@@ -83,7 +92,7 @@ Sistema completo para captura, armazenamento e análise de resultados de inspeç
 - OpenCV (processamento de imagens)
 - NumPy (computação numérica)
 - Flask-SocketIO (WebSocket para comunicação em tempo real)
-- Sistema de ferramentas modulares (grayscale, blob, math)
+- Sistema de ferramentas modulares (grayscale, blob, locate, math)
 - Sistema de logging com arquivos `.alog`
 - Buffer em memória para performance
 - Sincronização automática com orquestrador
@@ -193,6 +202,7 @@ analyticLens/
 │  ├─ tools/             # Ferramentas de visão computacional
 │  ├─ test_tools.py      # Sistema de testes automatizados
 │  ├─ TOOLS_README.md    # Documentação completa das tools
+│  ├─ tools/README_LocateTool.md  # Guia dedicado da Locate
 │  ├─ vm_config.json     # Configuração das tools
 │  └─ requirements.txt   # Dependências da Vision Machine
 ├─ modelagem/            # Documentação UML e modelagem do sistema

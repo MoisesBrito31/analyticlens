@@ -116,6 +116,11 @@ class LocateToolConfigInline(admin.StackedInline):
     model = LocateToolConfig
     extra = 0
     can_delete = True
+    fieldsets = [
+        ('Arrow', { 'fields': ['arrow_p0_x','arrow_p0_y','arrow_p1_x','arrow_p1_y'] }),
+        ('Parâmetros', { 'fields': ['threshold_mode','threshold','adaptive_k','polaridade','edge_select','smooth_ksize','grad_kernel','apply_transform','rotate'] }),
+        ('Reference', { 'fields': ['reference_x','reference_y','reference_A'] }),
+    ]
 
 
 class MathToolInline(admin.StackedInline):

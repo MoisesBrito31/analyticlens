@@ -226,13 +226,21 @@ class InspectionProcessor:
         return roi
 
     def _compute_cumulative_offset(self, upto_index: int):
-        """Computa offset cumulativo (dx, dy, dtheta) até a ferramenta anterior com apply_transform=true.
-        Regra: usa o resultado da última ferramenta com tool_type == 'locate' e apply_transform==true
-        que tenha offset no resultado. Não compõe múltiplas; aplica somente a última.
+        """Computa offset cumulativo (dx, dy, dtheta_deg) somando todas as ferramentas anteriores
+        com apply_transform=true (tipicamente Locate) até o índice anterior a `upto_index`.
+
+        Regras de composição (simples e robustas para coordenadas globais):
+        - Somar dx e dy em coordenadas globais
+        - Somar dtheta_deg apenas quando a ferramenta anterior tiver rotate=true
+        - O flag rotate final é verdadeiro se qualquer ferramenta anterior tiver rotate=true
         """
         try:
-            # percorrer resultados anteriores do fim para o início
-            for j in range(upto_index - 1, -1, -1):
+            total_dx = 0.0
+            total_dy = 0.0
+            total_dth = 0.0
+            any_rotate = False
+            # percorrer do início até a ferramenta anterior (ordem natural de composição)
+            for j in range(0, max(0, upto_index)):
                 tool_j = self.tools[j]
                 res_key = tool_j.id if tool_j.id is not None else f"idx_{j}"
                 res = self.results.get(res_key)
@@ -268,11 +276,19 @@ class InspectionProcessor:
                         dx = dy = dth = 0.0
                 else:
                     continue
+
+                total_dx += float(dx)
+                total_dy += float(dy)
+                if rot:
+                    any_rotate = True
+                    total_dth += float(dth)
+
+            if total_dx != 0.0 or total_dy != 0.0 or total_dth != 0.0:
                 return {
-                    'dx': float(dx),
-                    'dy': float(dy),
-                    'dtheta_deg': float(dth),
-                    'rotate': rot
+                    'dx': float(total_dx),
+                    'dy': float(total_dy),
+                    'dtheta_deg': float(total_dth),
+                    'rotate': bool(any_rotate)
                 }
         except Exception:
             return None

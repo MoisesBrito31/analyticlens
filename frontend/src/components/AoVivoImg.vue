@@ -477,7 +477,9 @@ watch([() => props.results, selectedIndex, roiEditEnabled], () => {
       selectedRoi.value = null
       selectedRoiShape.value = { shape: 'ellipse', ellipse: { ...s.ellipse } }
     }
-  } catch {}
+  } catch {
+    // noop
+  }
 }, { deep: true })
 
 onBeforeUnmount(() => {
@@ -526,22 +528,13 @@ function extractRoiShape(obj) {
   return rect ? { shape: 'rect', rect } : null
 }
 
-function itemKey(item, idx) {
-  const base = String(item?.id ?? item?.name ?? item?.type ?? '')
-  return base || `idx_${idx}`
-}
+// function cardName(item) {
+//   return item?.name || item?.tool_name || 'Sem nome'
+// }
 
-function cardTitle(item) {
-  return cardName(item) || cardType(item)
-}
-
-function cardName(item) {
-  return item?.name || item?.tool_name || 'Sem nome'
-}
-
-function cardType(item) {
-  return item?.type || item?.tool_type || '—'
-}
+// function cardType(item) {
+//   return item?.type || item?.tool_type || '—'
+// }
 
 function extractRoi(item) {
   if (!item || typeof item !== 'object') return null
@@ -608,14 +601,6 @@ function buildInspectionPayload(overrides = {}) {
     const dv = def?.[key]
     if (dv !== undefined) return dv
     return fallback
-  }
-
-  const pickCalibration = (obj, keys) => {
-    const out = {}
-    for (const k of keys) {
-      if (obj[k] !== undefined) out[k] = obj[k]
-    }
-    return out
   }
 
   const resultTools = toolsOrdered.map((it, idx) => {
@@ -744,9 +729,9 @@ function onSelectCard(idx) {
 
 // Removido: handlers de reordenação
 
-function isToolSelectedIdx(idx) {
-  return selectedIndex.value === idx
-}
+// function isToolSelectedIdx(idx) {
+//   return selectedIndex.value === idx
+// }
 
 // Auto-seleção da primeira ferramenta na primeira carga
 watch([() => props.results, () => props.tools], ([resultsList, toolsList]) => {
@@ -763,16 +748,16 @@ watch([() => props.results, () => props.tools], ([resultsList, toolsList]) => {
   }
 }, { immediate: true })
 
-function cardClass(item, idx) {
-  return { selected: isToolSelectedIdx(idx) }
-}
+// function cardClass(item, idx) {
+//   return { selected: isToolSelectedIdx(idx) }
+// }
 
-function statusClass(item) {
-  const pf = extractPassFail(item)
-  if (pf === true) return 'status-pass'
-  if (pf === false) return 'status-fail'
-  return 'status-unknown'
-}
+// function statusClass(item) {
+//   const pf = extractPassFail(item)
+//   if (pf === true) return 'status-pass'
+//   if (pf === false) return 'status-fail'
+//   return 'status-unknown'
+// }
 
 const selectedItem = computed(() => {
   if (selectedIndex.value < 0) return null
@@ -1338,7 +1323,9 @@ function onParamsUpdate({ key, value }) {
       try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
       emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
     }
-  } catch {}
+  } catch {
+    // noop
+  }
 }
 
 // Define a referência (reference) da Locate com base no resultado atual
@@ -1353,7 +1340,9 @@ function setLocateReference() {
   try {
     const list = Array.isArray(props.results) ? props.results : []
     resIt = list.find(r => (id != null && r?.tool_id === id) || (name && (r?.tool_name === name || r?.name === name))) || null
-  } catch {}
+  } catch {
+    // noop
+  }
   const cur = (resIt && typeof resIt.result === 'object') ? resIt.result : null
   const x = cur ? Number(cur.x) : Number(it?.primary_point?.x)
   const y = cur ? Number(cur.y) : Number(it?.primary_point?.y)
@@ -1369,7 +1358,9 @@ function setLocateReference() {
     const full = buildInspectionPayload({ toolsOrdered: cloned })
     try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
     emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
-  } catch {}
+  } catch {
+    // noop
+  }
 }
 
 // seleção de tipo agora via selectedToolType
@@ -1425,7 +1416,9 @@ function onLocateArrowChange(newArrow) {
         p1: { x: Number(newArrow?.p1?.x) || 0, y: Number(newArrow?.p1?.y) || 0 }
       }
     }
-  } catch {}
+  } catch {
+    // noop
+  }
 
   // E também envia a configuração completa para aplicação online
   try {
@@ -1439,7 +1432,9 @@ function onLocateArrowChange(newArrow) {
     const full = buildInspectionPayload({ toolsOrdered: cloned })
     try { lastSentJson.value = JSON.stringify(full, null, 2) } catch { lastSentJson.value = String(full) }
     emit('update-tool-param', { index: -1, key: 'INSPECTION_CONFIG', value: full })
-  } catch {}
+  } catch {
+    // noop
+  }
 }
 
 // ----- Locate overlays -----
@@ -1451,6 +1446,95 @@ function toggleLocateEdges() { showLocateEdges.value = !showLocateEdges.value }
 // Override local para refletir edição imediata da seta até que tools/results retornem
 const localArrowOverride = ref({})
 
+function rotatePointAround(px, py, cx, cy, angleDeg) {
+  const a = (Number(angleDeg) || 0) * Math.PI / 180
+  const dx = px - cx
+  const dy = py - cy
+  const cos = Math.cos(a)
+  const sin = Math.sin(a)
+  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos }
+}
+
+function getResultOffset(it) {
+  try {
+    const rt = it?.debug?.roi_transform
+    const off = rt?.offset
+    if (off && typeof off === 'object') {
+      return {
+        dx: Number(off.dx) || 0,
+        dy: Number(off.dy) || 0,
+        dtheta_deg: Number(off.dtheta_deg) || 0,
+        rotate: !!off.rotate
+      }
+    }
+  } catch {
+    // noop
+  }
+  return { dx: 0, dy: 0, dtheta_deg: 0, rotate: false }
+}
+
+function centerFromRoiObj(roiLike) {
+  if (!roiLike || typeof roiLike !== 'object') return null
+  try {
+    const shape = roiLike.shape
+    if (shape === 'rect') {
+      const r = roiLike.rect || roiLike
+      const rnorm = normalizeRoi(r)
+      if (rnorm) return { cx: rnorm.x + rnorm.w / 2, cy: rnorm.y + rnorm.h / 2 }
+    }
+    if (shape === 'circle' && roiLike.circle) {
+      const cx = Number(roiLike.circle.cx)
+      const cy = Number(roiLike.circle.cy)
+      if (isFinite(cx) && isFinite(cy)) return { cx, cy }
+    }
+    if (shape === 'ellipse' && roiLike.ellipse) {
+      const cx = Number(roiLike.ellipse.cx)
+      const cy = Number(roiLike.ellipse.cy)
+      if (isFinite(cx) && isFinite(cy)) return { cx, cy }
+    }
+    // Legacy rect
+    const rlegacy = normalizeRoi(roiLike)
+    if (rlegacy) return { cx: rlegacy.x + rlegacy.w / 2, cy: rlegacy.y + rlegacy.h / 2 }
+  } catch {
+    // noop
+  }
+  return null
+}
+
+function getItemRoiCenter(it) {
+  // Preferir centro do ROI antes da transformação (debug), para pivot de rotação correto
+  try {
+    const rb = it?.debug?.roi_debug?.roi_before
+    const pivot = centerFromRoiObj(rb)
+    if (pivot && isFinite(pivot.cx) && isFinite(pivot.cy)) return pivot
+  } catch {
+    // noop
+  }
+  // Fallback: centro do ROI efetivo exibido
+  const roi = extractRoi(it) || effectiveRoiRect.value
+  if (roi) {
+    const cx = roi.x + roi.w / 2
+    const cy = roi.y + roi.h / 2
+    return { cx, cy }
+  }
+  return { cx: 0, cy: 0 }
+}
+
+function getToolArrowFromDef(it) {
+  try {
+    // Prioriza definição exata da ferramenta
+    const def = findToolDefForItem(it)
+    const ar = def && def.arrow ? def.arrow : null
+    if (ar && ar.p0 && ar.p1) return { p0: { x: Number(ar.p0.x)||0, y: Number(ar.p0.y)||0 }, p1: { x: Number(ar.p1.x)||0, y: Number(ar.p1.y)||0 } }
+  } catch {
+    // noop
+  }
+  // fallback pela posição do ROI
+  const r = extractRoi(it) || effectiveRoiRect.value
+  if (r) return { p0: { x: r.x + r.w * 0.1, y: r.y + r.h * 0.5 }, p1: { x: r.x + r.w * 0.9, y: r.y + r.h * 0.5 } }
+  return null
+}
+
 const locateArrowPx = computed(() => {
   if (!isLocateSelected.value) return null
   const it = selectedItem.value || {}
@@ -1459,12 +1543,29 @@ const locateArrowPx = computed(() => {
   if (o && o.p0 && o.p1) {
     return { p0: { x: Number(o.p0.x)||0, y: Number(o.p0.y)||0 }, p1: { x: Number(o.p1.x)||0, y: Number(o.p1.y)||0 } }
   }
-  const ar = it.arrow && typeof it.arrow === 'object' ? it.arrow : null
-  if (ar && ar.p0 && ar.p1) return { p0: { x: Number(ar.p0.x)||0, y: Number(ar.p0.y)||0 }, p1: { x: Number(ar.p1.x)||0, y: Number(ar.p1.y)||0 } }
-  // Fallback do ROI
-  const r = extractRoi(it) || effectiveRoiRect.value
-  if (r) return { p0: { x: r.x + r.w * 0.1, y: r.y + r.h * 0.5 }, p1: { x: r.x + r.w * 0.9, y: r.y + r.h * 0.5 } }
-  return null
+
+  // Quando edição de ROI está ativa, desenhar a seta da configuração da tool (sem offset)
+  if (roiEditEnabled.value) {
+    return getToolArrowFromDef(it)
+  }
+
+  // Caso normal: usar arrow do resultado aplicado do offset (mesmo princípio do ROI)
+  const base = (it.arrow && it.arrow.p0 && it.arrow.p1) ? it.arrow : getToolArrowFromDef(it)
+  if (!base) return null
+  const { dx, dy, dtheta_deg, rotate } = getResultOffset(it)
+  const { cx, cy } = getItemRoiCenter(it)
+  // Aplica translação e, se rotate=true, rotação em torno do centro do ROI efetivo
+  let p0x = Number(base.p0.x) || 0
+  let p0y = Number(base.p0.y) || 0
+  let p1x = Number(base.p1.x) || 0
+  let p1y = Number(base.p1.y) || 0
+  p0x += dx; p0y += dy; p1x += dx; p1y += dy
+  if (rotate && Math.abs(dtheta_deg) > 1e-6) {
+    const r0 = rotatePointAround(p0x, p0y, cx, cy, dtheta_deg)
+    const r1 = rotatePointAround(p1x, p1y, cx, cy, dtheta_deg)
+    p0x = r0.x; p0y = r0.y; p1x = r1.x; p1y = r1.y
+  }
+  return { p0: { x: p0x, y: p0y }, p1: { x: p1x, y: p1y } }
 })
 
 const locateEdgesPx = computed(() => {
@@ -1472,7 +1573,26 @@ const locateEdgesPx = computed(() => {
   const it = selectedItem.value || {}
   const edges = Array.isArray(it.edges) ? it.edges : []
   if (!edges.length) return []
-  return edges.map(e => ({ x: Number(e.x)||0, y: Number(e.y)||0, angle_deg: Number(e.angle_deg)||0, strength: Number(e.strength)||0 }))
+  // Se edição de ROI estiver ativa, exibir edges brutos
+  if (roiEditEnabled.value) {
+    return edges.map(e => ({ x: Number(e.x)||0, y: Number(e.y)||0, angle_deg: Number(e.angle_deg)||0, strength: Number(e.strength)||0 }))
+  }
+  // Caso normal: aplicar o mesmo offset do ROI/arrow às bordas
+  const { dx, dy, dtheta_deg, rotate } = getResultOffset(it)
+  const { cx, cy } = getItemRoiCenter(it)
+  return edges.map(_e => {
+    const e = { x: Number(_e.x)||0, y: Number(_e.y)||0, angle_deg: Number(_e.angle_deg)||0, strength: Number(_e.strength)||0 }
+    let x = e.x + dx
+    let y = e.y + dy
+    let ang = e.angle_deg
+    if (rotate && Math.abs(dtheta_deg) > 1e-6) {
+      const r = rotatePointAround(x, y, cx, cy, dtheta_deg)
+      x = r.x
+      y = r.y
+      ang = e.angle_deg + dtheta_deg
+    }
+    return { x, y, angle_deg: ang, strength: e.strength }
+  })
 })
 
 function onAddTool(newTool) {

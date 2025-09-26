@@ -13,6 +13,7 @@ O sistema de ferramentas da Vision Machine é uma arquitetura modular que permit
 BaseTool (abstrata)
 ├── GrayscaleTool (filtro)
 ├── BlobTool (análise)
+├── LocateTool (análise/geo)
 └── MathTool (matemática)
 ```
 
@@ -31,7 +32,9 @@ BaseTool (abstrata)
 
 ### **2. Ferramentas de Análise (`analysis`)**
 - **Propósito**: Extraem informações e métricas da imagem
-- **Exemplo**: `BlobTool` - detecta e analisa blobs
+- **Exemplos**:
+  - `BlobTool` - detecta e analisa blobs
+  - `LocateTool` - localiza uma borda ao longo de uma seta e produz referência, resultado e offset
 - **Característica**: Não modificam a imagem, apenas analisam
 
 ### **3. Ferramentas Matemáticas (`math`)**
@@ -100,6 +103,45 @@ BaseTool (abstrata)
 ```
 
 ### **2. BlobTool**
+### **3. LocateTool**
+**Tipo**: `locate` (análise/geo)
+
+**Parâmetros**:
+- `threshold_mode`: `'fixed' | 'adaptive'` (padrão: `fixed`)
+- `threshold`: número (padrão: 20) quando `fixed`
+- `adaptive_k`: número (padrão: 1.0) quando `adaptive`
+- `polaridade`: `'dark_to_light' | 'light_to_dark' | 'any'` (padrão: `any`)
+- `edge_select`: `'first' | 'strongest' | 'closest_to_mid'` (padrão: `strongest`)
+- `smooth_ksize`: ímpar, padrão 5
+- `grad_kernel`: 1,3,5 (padrão 3)
+- `apply_transform`: boolean (padrão false) — quando true, o offset da Locate é aplicado às tools seguintes
+- `rotate`: boolean (padrão false) — quando true, inclui rotação no offset
+- `reference`: `{ x, y, angle_deg } | null` — ponto/ângulo de referência para cálculo do offset
+- `arrow`: `{ p0: {x,y}, p1: {x,y} }` — define a seta de amostragem
+
+**Resultado**:
+```json
+{
+  "tool_id": 2,
+  "tool_name": "locate_1",
+  "tool_type": "locate",
+  "processing_time_ms": 3.12,
+  "edges": [{"x": 120.4, "y": 80.1, "angle_deg": 175.2, "strength": 42.5}],
+  "edge_count": 1,
+  "reference": {"x": 100.0, "y": 80.0, "angle_deg": 180.0},
+  "result": {"x": 120.4, "y": 80.1, "angle_deg": 175.2},
+  "offset": {"x": 20.4, "y": 0.1, "angle_deg": -4.8},
+  "rotate": false,
+  "apply_transform": true,
+  "arrow": {"p0": {"x": 90, "y": 70}, "p1": {"x": 210, "y": 70}}
+}
+```
+
+**Observações**:
+- Quando `apply_transform=true`, o `InspectionProcessor` aplica o offset às ROIs das ferramentas seguintes.
+- Offsets agora são acumulados ao longo de múltiplas `Locate` anteriores (dx/dy somados; dtheta somado apenas das que tiverem `rotate=true`).
+- O ROI efetivo usado por cada tool é exportado em `result.ROI` e um bloco `debug.roi_debug` descreve a transformação.
+
 **Tipo**: `blob` (análise)
 
 **Parâmetros**:

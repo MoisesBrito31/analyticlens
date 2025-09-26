@@ -75,7 +75,7 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
 
 ## Detalhes por seção
 
-### Imagem, overlays e edição de ROI
+### Imagem, overlays e edição de ROI (com Locate/offset)
 
 - O frame é exibido como `<img />` com `object-fit` configurável por `fit`.
 - O overlay é um SVG com `viewBox` baseado em `resolution` e desenha:
@@ -84,6 +84,10 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
   - Caixas (bounding boxes) dos blobs
   - Contornos/polígonos dos blobs
 - Edição de ROI: pode ser feita pelo overlay (drag/handles) ou pela aba Parâmetros (campos numéricos). Mudanças refletem imediatamente no overlay e são emitidas ao pai como `update-tool-param` (key `ROI`).
+- Locate e offset em tempo real:
+  - Quando uma `Locate` anterior tem `apply_transform=true`, o ROI efetivo das tools seguintes é realocado automaticamente pelo offset.
+  - A seta (`arrow`) e as bordas (edges) da `Locate` selecionada também exibem o offset aplicado quando a edição de ROI está desabilitada.
+  - Toggle “Edição ROI”: quando ligado, o overlay exibe e permite editar o ROI/arrow da configuração (sem offset); quando desligado, exibe o ROI/arrow efetivos (com offset).
 
 ### ToolCardsPanel: adicionar, reordenar, duplicar e apagar
 
@@ -113,7 +117,7 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
 
 ### Parâmetros de tools (edição)
 
-- `ToolParamsPanel` seleciona subpainéis conforme o tipo da tool: `blob`, `grayscale`, `blur`, `threshold`, `morphology`, `math`.
+- `ToolParamsPanel` seleciona subpainéis conforme o tipo da tool: `blob`, `grayscale`, `blur`, `threshold`, `morphology`, `math`, `locate`.
 - Para `blob`, os principais campos expostos:
   - `inspec_pass_fail`, `th_min`, `th_max`, `area_min`, `area_max`
   - `total_area_test`, `blob_count_test`
@@ -125,6 +129,13 @@ Ele foi modularizado para manter responsabilidade clara, melhor legibilidade e m
   - Editável na aba de Parâmetros; aplica normalização automática: remove acentos, substitui espaços/símbolos por `_`, colapsa underscores e faz trim;
   - Unicidade: nomes duplicados são bloqueados; mensagem de erro em vermelho é exibida e nenhuma atualização é emitida até o nome ficar válido.
 - Em modo `readOnly=true`, os campos ficam desabilitados (somente leitura); o `inspec_pass_fail` também aparece em leitura.
+
+#### Parâmetros específicos de Locate (na aba Parâmetros)
+- `threshold_mode`, `threshold`, `adaptive_k`, `polaridade`, `edge_select`, `smooth_ksize`, `grad_kernel`
+- `apply_transform`: quando true, realoca ROIs subsequentes com base no `offset` calculado
+- `rotate`: quando true, inclui rotação no deslocamento
+- `reference`: `{x, y, angle_deg}`; botão “Definir referência (usar resultado atual)” faz sync com o resultado corrente
+- `arrow`: `{p0, p1}` editável no overlay quando Edição ROI está ligada
 
 ### Composables
 

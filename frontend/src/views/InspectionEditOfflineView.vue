@@ -407,6 +407,20 @@
                                 <span class="ms-2">apply_transform</span>
                               </div>
                             </BCol>
+                        <BCol cols="12" md="6" class="d-flex align-items-end">
+                          <div>
+                            <input type="checkbox" v-model="selectedTool.rotate" />
+                            <span class="ms-2">rotate</span>
+                          </div>
+                        </BCol>
+                        <BCol cols="12" class="mt-2">
+                          <div class="small text-muted">reference (x, y, angle_deg)</div>
+                          <BRow class="g-2">
+                            <BCol cols="4"><BFormInput v-model.number="selectedTool.reference.x" type="number" placeholder="x" /></BCol>
+                            <BCol cols="4"><BFormInput v-model.number="selectedTool.reference.y" type="number" placeholder="y" /></BCol>
+                            <BCol cols="4"><BFormInput v-model.number="selectedTool.reference.angle_deg" type="number" placeholder="angle_deg" /></BCol>
+                          </BRow>
+                        </BCol>
                           </BRow>
                           <div class="mt-2 mb-1 fw-semibold small text-muted">Arrow (p0 → p1)</div>
                           <BRow class="g-2">
@@ -1102,6 +1116,8 @@ function addTool(type) {
       smooth_ksize: 5,
       grad_kernel: 3,
       apply_transform: false,
+      rotate: false,
+      reference: { x: null, y: null, angle_deg: null },
       arrow: { p0: { x: 0.1 * roiFull.rect.w, y: 0.5 * roiFull.rect.h }, p1: { x: 0.9 * roiFull.rect.w, y: 0.5 * roiFull.rect.h } }
     }
   } else {
@@ -1167,6 +1183,8 @@ async function load() {
         t.smooth_ksize = (t.smooth_ksize != null ? t.smooth_ksize : 5)
         t.grad_kernel = (t.grad_kernel != null ? t.grad_kernel : 3)
         t.apply_transform = !!t.apply_transform
+      t.rotate = !!t.rotate
+      if (!t.reference || typeof t.reference !== 'object') t.reference = { x: null, y: null, angle_deg: null }
         if (!t.arrow || typeof t.arrow !== 'object') t.arrow = { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } }
         if (!t.arrow.p0) t.arrow.p0 = { x: 0, y: 0 }
         if (!t.arrow.p1) t.arrow.p1 = { x: 0, y: 0 }
@@ -1307,15 +1325,23 @@ async function save() {
         th_min: t.th_min,
         th_max: t.th_max,
         // Locate params (se presentes)
-        threshold_mode: t.threshold_mode,
-        threshold: (t.threshold != null ? t.threshold : t.th_min),
-        adaptive_k: t.adaptive_k,
-        polaridade: t.polaridade,
-        edge_select: t.edge_select,
-        smooth_ksize: t.smooth_ksize,
-        grad_kernel: t.grad_kernel,
-        apply_transform: t.apply_transform,
-        arrow: t.arrow,
+        ...(String(t.type||'').toLowerCase()==='locate' ? {
+          threshold_mode: String(t.threshold_mode || 'fixed'),
+          threshold: Number((t.threshold != null ? t.threshold : (t.th_min != null ? t.th_min : 20))),
+          adaptive_k: Number((t.adaptive_k != null ? t.adaptive_k : 1.0)),
+          polaridade: String(t.polaridade || 'any'),
+          edge_select: String(t.edge_select || 'strongest'),
+          smooth_ksize: Number((t.smooth_ksize != null ? t.smooth_ksize : 5)),
+          grad_kernel: Number((t.grad_kernel != null ? t.grad_kernel : 3)),
+          apply_transform: !!t.apply_transform,
+          rotate: !!t.rotate,
+          reference: {
+            x: (t.reference && t.reference.x != null) ? Number(t.reference.x) : null,
+            y: (t.reference && t.reference.y != null) ? Number(t.reference.y) : null,
+            angle_deg: (t.reference && t.reference.angle_deg != null) ? Number(t.reference.angle_deg) : null,
+          },
+          arrow: (t.arrow && t.arrow.p0 && t.arrow.p1) ? t.arrow : { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } },
+        } : {}),
         kernel: t.kernel,
         open: t.open,
         close: t.close,
@@ -1366,15 +1392,23 @@ async function save() {
           th_min: t.th_min,
           th_max: t.th_max,
           // Locate params (se presentes)
-          threshold_mode: t.threshold_mode,
-          threshold: (t.threshold != null ? t.threshold : t.th_min),
-          adaptive_k: t.adaptive_k,
-          polaridade: t.polaridade,
-          edge_select: t.edge_select,
-          smooth_ksize: t.smooth_ksize,
-          grad_kernel: t.grad_kernel,
-          apply_transform: t.apply_transform,
-          arrow: t.arrow,
+          ...(String(t.type||'').toLowerCase()==='locate' ? {
+            threshold_mode: String(t.threshold_mode || 'fixed'),
+            threshold: Number((t.threshold != null ? t.threshold : (t.th_min != null ? t.th_min : 20))),
+            adaptive_k: Number((t.adaptive_k != null ? t.adaptive_k : 1.0)),
+            polaridade: String(t.polaridade || 'any'),
+            edge_select: String(t.edge_select || 'strongest'),
+            smooth_ksize: Number((t.smooth_ksize != null ? t.smooth_ksize : 5)),
+            grad_kernel: Number((t.grad_kernel != null ? t.grad_kernel : 3)),
+            apply_transform: !!t.apply_transform,
+            rotate: !!t.rotate,
+            reference: {
+              x: (t.reference && t.reference.x != null) ? Number(t.reference.x) : null,
+              y: (t.reference && t.reference.y != null) ? Number(t.reference.y) : null,
+              angle_deg: (t.reference && t.reference.angle_deg != null) ? Number(t.reference.angle_deg) : null,
+            },
+            arrow: (t.arrow && t.arrow.p0 && t.arrow.p1) ? t.arrow : { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } },
+          } : {}),
           kernel: t.kernel,
           open: t.open,
           close: t.close,
@@ -1426,6 +1460,23 @@ function showJson() {
       mode: t.mode,
       th_min: t.th_min,
       th_max: t.th_max,
+      ...(String(t.type||'').toLowerCase()==='locate' ? {
+        threshold_mode: String(t.threshold_mode || 'fixed'),
+        threshold: Number((t.threshold != null ? t.threshold : (t.th_min != null ? t.th_min : 20))),
+        adaptive_k: Number((t.adaptive_k != null ? t.adaptive_k : 1.0)),
+        polaridade: String(t.polaridade || 'any'),
+        edge_select: String(t.edge_select || 'strongest'),
+        smooth_ksize: Number((t.smooth_ksize != null ? t.smooth_ksize : 5)),
+        grad_kernel: Number((t.grad_kernel != null ? t.grad_kernel : 3)),
+        apply_transform: !!t.apply_transform,
+        rotate: !!t.rotate,
+        reference: {
+          x: (t.reference && t.reference.x != null) ? Number(t.reference.x) : null,
+          y: (t.reference && t.reference.y != null) ? Number(t.reference.y) : null,
+          angle_deg: (t.reference && t.reference.angle_deg != null) ? Number(t.reference.angle_deg) : null,
+        },
+        arrow: (t.arrow && t.arrow.p0 && t.arrow.p1) ? t.arrow : { p0: { x: 0, y: 0 }, p1: { x: 0, y: 0 } },
+      } : {}),
       kernel: t.kernel,
       open: t.open,
       close: t.close,
@@ -1481,6 +1532,8 @@ async function updateVM() {
       smooth_ksize: t.smooth_ksize,
       grad_kernel: t.grad_kernel,
       apply_transform: t.apply_transform,
+      rotate: t.rotate,
+      reference: t.reference,
       arrow: t.arrow,
       kernel: t.kernel,
       open: t.open,

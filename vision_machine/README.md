@@ -114,6 +114,7 @@ Observações:
 ### **🔧 Ferramentas Disponíveis**
 - **GrayscaleTool**: Conversão para escala de cinza
 - **BlobTool**: Detecção e análise de blobs
+- **LocateTool**: Localização de borda ao longo de seta; exporta referência/resultado/offset; pode realocar ROIs subsequentes
 - **MathTool**: Operações matemáticas sobre resultados
 
 ### **📡 APIs Disponíveis**

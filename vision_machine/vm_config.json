@@ -21,8 +21,7 @@
         },
         "inspec_pass_fail": false,
         "method": "luminance",
-        "normalize": false,
-        "rotate": false
+        "normalize": false
       },
       {
         "order_index": 1,
@@ -39,48 +38,85 @@
         },
         "inspec_pass_fail": false,
         "threshold_mode": "fixed",
-        "threshold": 140,
+        "threshold": 128,
         "adaptive_k": 1,
         "polaridade": "dark_to_light",
-        "edge_select": "first",
+        "edge_select": "strongest",
         "smooth_ksize": 5,
         "grad_kernel": 3,
         "apply_transform": true,
         "rotate": false,
         "reference": {
-          "x": 373.522216796875,
-          "y": 32.57450866699219,
+          "x": 371,
+          "y": 163.3311004638672,
           "angle_deg": 180
         },
         "arrow": {
           "p0": {
-            "x": 372.51237152645604,
-            "y": 15.56782134246923
+            "x": 371,
+            "y": 15
           },
           "p1": {
-            "x": 374.55272173582034,
-            "y": 453.44118766653975
+            "x": 371,
+            "y": 463
           }
         }
       },
       {
         "order_index": 2,
+        "name": "locate_4",
+        "type": "locate",
+        "ROI": {
+          "shape": "rect",
+          "rect": {
+            "x": 97,
+            "y": 199,
+            "w": 564,
+            "h": 136
+          }
+        },
+        "inspec_pass_fail": false,
+        "threshold_mode": "fixed",
+        "threshold": 128,
+        "adaptive_k": 1,
+        "polaridade": "dark_to_light",
+        "edge_select": "strongest",
+        "smooth_ksize": 5,
+        "grad_kernel": 3,
+        "apply_transform": true,
+        "rotate": false,
+        "reference": {
+          "x": 261.3538513183594,
+          "y": 272.0121765136719,
+          "angle_deg": 90
+        },
+        "arrow": {
+          "p0": {
+            "x": 167.04428372034005,
+            "y": 272.84304022332196
+          },
+          "p1": {
+            "x": 609.496637482553,
+            "y": 268.9450577337901
+          }
+        }
+      },
+      {
+        "order_index": 3,
         "name": "blob_2",
         "type": "blob",
         "ROI": {
           "shape": "rect",
           "rect": {
-            "x": 277.1328511610202,
-            "y": 41.95178276868421,
-            "w": 203.88732394366195,
-            "h": 192.55437127268112
+            "x": 283,
+            "y": 172,
+            "w": 195,
+            "h": 192
           }
         },
         "inspec_pass_fail": true,
         "th_min": 0,
         "th_max": 20,
-        "threshold": 200,
-        "rotate": false,
         "area_min": 0,
         "area_max": 3000000,
         "total_area_test": false,
@@ -96,7 +132,9 @@
     ],
     "source_config": {
       "type": "pasta",
+      "camera_id": 0,
       "folder_path": "./test_locate_nv1",
+      "rtsp_url": "",
       "fps": 30,
       "resolution": [
         752,
@@ -105,7 +143,7 @@
     },
     "trigger_config": {
       "type": "continuous",
-      "interval_ms": 200
+      "interval_ms": 400
     }
   },
   "source_config": {
@@ -121,7 +159,7 @@
   },
   "trigger_config": {
     "type": "continuous",
-    "interval_ms": 200
+    "interval_ms": 400
   },
   "logging": {
     "enabled": true,
@@ -133,5 +171,5 @@
   },
   "error_msg": "",
   "websocket_update_RUN_mode": 1.0,
-  "last_saved": "2025-09-26T16:29:03.224736"
+  "last_saved": "2025-09-26T20:13:25.221732"
 }
